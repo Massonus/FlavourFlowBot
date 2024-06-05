@@ -12,6 +12,12 @@ def redirect(message):
     webbrowser.open_new_tab('http://flavourflow.eu-central-1.elasticbeanstalk.com')
 
 
+@bot.message_handler(commands=['image'])
+def redirect(message):
+    bot.send_photo(message.chat.id,
+                   'https://dl.dropboxusercontent.com/scl/fi/3ydxuft93439s8klnjl6g/COMPANY2.jpg?rlkey=18aqwj4v50mozjjsfrcdc0pgg&dl=0')
+
+
 @bot.message_handler(commands=['start'])
 def start(message):
     bot.send_message(message.chat.id, f'Hello {message.from_user.first_name}')
