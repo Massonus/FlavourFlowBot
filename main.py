@@ -1,7 +1,10 @@
 import telebot
 import webbrowser
 
-bot = telebot.TeleBot('7355178536:AAG-NHhqQKDMF-2OuUOO1kHCktX5NgA0AfE')
+with open("token.txt") as f:
+    TOKEN = f.read().strip()
+
+bot = telebot.TeleBot(TOKEN)
 
 
 @bot.message_handler(commands=['site', 'website'])
