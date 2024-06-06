@@ -1,8 +1,9 @@
 import sqlalchemy
 import pandas as pd
 from sqlalchemy import exc
+from config import postgres_username, postgres_password
 
-engine = sqlalchemy.create_engine("postgresql+psycopg2://postgres:root@localhost:5432/Test")
+engine = sqlalchemy.create_engine(f"postgresql+psycopg2://{postgres_username}:{postgres_password}@localhost:5432/Test")
 
 
 def get_pending_users():
