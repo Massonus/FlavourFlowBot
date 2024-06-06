@@ -1,6 +1,7 @@
 import telebot
 import webbrowser
 import dropbox_factory
+import database_factory
 from config import GROUP_ID, TG_TOKEN
 
 from telebot import types
@@ -34,14 +35,6 @@ def redirect(message):
                    reply_markup=markup, caption="text")
 
 
-@bot.callback_query_handler(func=lambda callback: True)
-def callback_message(callback):
-    if callback.data == 'delete':
-        bot.delete_message(callback.message.chat.id, callback.message.message_id)
-    elif callback.data == 'edit':
-        bot.edit_message_caption('Edit', callback.message.chat.id, callback.message.message_id)
-
-
 @bot.message_handler(commands=['start'])
 def start(message):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -63,17 +56,57 @@ def on_click(message):
 
 @bot.message_handler(commands=['help'])
 def command_help(message):
-    bot.send_message(message.chat.id, message.chat.id)
+    # bot.send_message(message.chat.id, message.chat.id)
     # bot.send_message(message.from_user.id, message.chat.id)
-    bot.send_message(message.chat.id, 'Enter your question')
-    bot.register_next_step_handler(message, next_step)
+    if message.from_user.id in database_factory.get_pending_users():
+        bot.send_message(message.chat.id, 'You have already sent a message, please wait an answer')
+    else:
+        bot.send_message(message.chat.id, 'Enter your question')
+        bot.register_next_step_handler(message, next_step, message.from_user.id)
 
 
-def next_step(message):
+def next_step(message, user_id):
     bot.reply_to(message, "Your question was sent")
+    database_factory.add_pending_user(user_id)
+    markup = types.InlineKeyboardMarkup()
+    btn1 = types.InlineKeyboardButton('💬 Answer', callback_data=f'{message.chat.id}-{message.from_user.id}-answer')
+    btn2 = types.InlineKeyboardButton('❎ Ignore', callback_data=f'{message.chat.id}-{message.from_user.id}-ignore')
+    markup.row(btn1, btn2)
     bot.send_message(GROUP_ID,
-                     f"User {message.from_user.id} sent a question: '{message.text}'. Enter <code>/answer "
-                     f"{message.from_user.id} 'answer'</code> to answer", parse_mode='HTML')
+                     f"<b>New question was taken!</b>"
+                     f"\n<b>From:</b> @{message.from_user.username} ({message.from_user.first_name})"
+                     f"\nID: {message.chat.id}"
+                     f"\n<b>Message:</b> \"{message.text}\"", reply_markup=markup, parse_mode='HTML')
+
+
+@bot.callback_query_handler(func=lambda callback: True)
+def callback_message(callback):
+    if callback.data == 'delete':
+        bot.delete_message(callback.message.chat.id, callback.message.message_id)
+    elif callback.data == 'edit':
+        bot.edit_message_caption('Edit', callback.message.chat.id, callback.message.message_id)
+    elif "answer" in callback.data:
+        text_split = callback.data.split("-")
+        chat_id = text_split[0]
+        message_id = callback.message.message_id
+        user_id = text_split[1]
+        bot.send_message(callback.message.chat.id, "Enter your answer: ")
+        bot.register_next_step_handler(callback.message, next_step2, chat_id, message_id, user_id)
+    elif "ignore" in callback.data:
+        text_split = callback.data.split("-")
+        chat_id = text_split[0]
+        message_id = callback.message.message_id
+        user_id = text_split[1]
+        bot.send_message(chat_id, "Unfortunately, your answer was denied")
+        bot.delete_message(GROUP_ID, message_id)
+        database_factory.delete_pending_user(user_id)
+
+
+def next_step2(message, chat_id, message_id, user_id):
+    bot.send_message(chat_id, f'Your have got an answer: \n<b>{message.text}</b>', parse_mode='HTML')
+    bot.reply_to(message, 'Your answer was sent')
+    database_factory.delete_pending_user(user_id)
+    bot.delete_message(GROUP_ID, message_id)
 
 
 @bot.message_handler()
@@ -82,12 +115,6 @@ def info(message):
         bot.send_message(message.chat.id, f'Hello {message.from_user.first_name}')
     elif message.text.lower() == "id":
         bot.reply_to(message, f'ID: {message.from_user.id}')
-    elif "/answer" in message.text:
-        text_split = message.text.split(" ")
-        user_id = text_split[1]
-        text = ' '.join(text_split[2:])
-        bot.send_message(user_id, f'Your have got an answer {text}')
-        bot.reply_to(message, 'Your answer was sent')
 
 
 bot.polling(non_stop=True)
