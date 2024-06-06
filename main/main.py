@@ -65,7 +65,7 @@ def next_step(message):
     bot.reply_to(message, "Your question was sent")
     markup = types.InlineKeyboardMarkup()
     btn1 = types.InlineKeyboardButton('💬 Answer', callback_data=f'{message.chat.id}-answer')
-    btn2 = types.InlineKeyboardButton('❎ Ignore', callback_data='ignore')
+    btn2 = types.InlineKeyboardButton('❎ Ignore', callback_data=f'{message.chat.id}-ignore')
     markup.row(btn1, btn2)
     bot.send_message(GROUP_ID,
                      f"<b>New question was taken!</b>"
@@ -86,6 +86,12 @@ def callback_message(callback):
         message_id = callback.message.message_id
         bot.send_message(callback.message.chat.id, "Enter your answer: ")
         bot.register_next_step_handler(callback.message, next_step2, chat_id, message_id)
+    elif "ignore" in callback.data:
+        text_split = callback.data.split("-")
+        chat_id = text_split[0]
+        message_id = callback.message.message_id
+        bot.send_message(chat_id, "Unfortunately, your answer was denied")
+        bot.delete_message(GROUP_ID, message_id)
 
 
 def next_step2(message, chat_id, message_id):
