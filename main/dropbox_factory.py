@@ -43,3 +43,8 @@ def get_dbx():
         return dbx_init_token()
     else:
         return dbx
+
+
+def upload_file(photo_bytes):
+    dbx = get_dbx()
+    dbx.files_upload(photo_bytes, "/test.jpg")
