@@ -1,6 +1,7 @@
 import telebot
 import webbrowser
 import dropbox_factory
+import database_factory
 from config import GROUP_ID, TG_TOKEN
 
 from telebot import types
@@ -57,15 +58,19 @@ def on_click(message):
 def command_help(message):
     # bot.send_message(message.chat.id, message.chat.id)
     # bot.send_message(message.from_user.id, message.chat.id)
-    bot.send_message(message.chat.id, 'Enter your question')
-    bot.register_next_step_handler(message, next_step)
+    if message.from_user.id in database_factory.get_pending_users():
+        bot.send_message(message.chat.id, 'You have already sent a message, please wait an answer')
+    else:
+        database_factory.add_pending_user(message.from_user.id)
+        bot.send_message(message.chat.id, 'Enter your question')
+        bot.register_next_step_handler(message, next_step)
 
 
 def next_step(message):
     bot.reply_to(message, "Your question was sent")
     markup = types.InlineKeyboardMarkup()
-    btn1 = types.InlineKeyboardButton('💬 Answer', callback_data=f'{message.chat.id}-answer')
-    btn2 = types.InlineKeyboardButton('❎ Ignore', callback_data=f'{message.chat.id}-ignore')
+    btn1 = types.InlineKeyboardButton('💬 Answer', callback_data=f'{message.chat.id}-{message.from_user.id}-answer')
+    btn2 = types.InlineKeyboardButton('❎ Ignore', callback_data=f'{message.chat.id}-{message.from_user.id}-ignore')
     markup.row(btn1, btn2)
     bot.send_message(GROUP_ID,
                      f"<b>New question was taken!</b>"
@@ -84,14 +89,18 @@ def callback_message(callback):
         text_split = callback.data.split("-")
         chat_id = text_split[0]
         message_id = callback.message.message_id
+        user_id = text_split[1]
         bot.send_message(callback.message.chat.id, "Enter your answer: ")
         bot.register_next_step_handler(callback.message, next_step2, chat_id, message_id)
+        database_factory.delete_pending_user(user_id)
     elif "ignore" in callback.data:
         text_split = callback.data.split("-")
         chat_id = text_split[0]
         message_id = callback.message.message_id
+        user_id = text_split[1]
         bot.send_message(chat_id, "Unfortunately, your answer was denied")
         bot.delete_message(GROUP_ID, message_id)
+        database_factory.delete_pending_user(user_id)
 
 
 def next_step2(message, chat_id, message_id):
