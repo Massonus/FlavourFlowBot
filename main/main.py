@@ -2,6 +2,8 @@ import telebot
 import webbrowser
 import dropbox_factory
 
+from telebot import types
+
 with open("../token.txt") as f:
     TOKEN = f.read().strip()
 
@@ -23,8 +25,23 @@ def handle_docs_photo(message):
 
 @bot.message_handler(commands=['image'])
 def redirect(message):
+    markup = types.InlineKeyboardMarkup()
+    btn1 = types.InlineKeyboardButton('Go to our site', url='http://flavourflow.eu-central-1.elasticbeanstalk.com')
+    markup.row(btn1)
+    btn2 = types.InlineKeyboardButton('Delete', callback_data='delete')
+    btn3 = types.InlineKeyboardButton('Edit', callback_data='edit')
+    markup.row(btn2, btn3)
     bot.send_photo(message.chat.id,
-                   'https://dl.dropboxusercontent.com/scl/fi/3ydxuft93439s8klnjl6g/COMPANY2.jpg?rlkey=18aqwj4v50mozjjsfrcdc0pgg&dl=0')
+                   'https://dl.dropboxusercontent.com/scl/fi/3ydxuft93439s8klnjl6g/COMPANY2.jpg?rlkey=18aqwj4v50mozjjsfrcdc0pgg&dl=0',
+                   reply_markup=markup, caption="text")
+
+
+@bot.callback_query_handler(func=lambda callback: True)
+def callback_message(callback):
+    if callback.data == 'delete':
+        bot.delete_message(callback.message.chat.id, callback.message.message_id)
+    elif callback.data == 'edit':
+        bot.edit_message_caption('Edit', callback.message.chat.id, callback.message.message_id)
 
 
 @bot.message_handler(commands=['start'])
