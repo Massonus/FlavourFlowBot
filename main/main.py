@@ -1,13 +1,11 @@
 import telebot
 import webbrowser
 import dropbox_factory
+from config import GROUP_ID, TG_TOKEN
 
 from telebot import types
 
-with open("../token.txt") as f:
-    TOKEN = f.read().strip()
-
-bot = telebot.TeleBot(TOKEN)
+bot = telebot.TeleBot(TG_TOKEN)
 
 
 @bot.message_handler(commands=['site', 'website'])
@@ -46,12 +44,36 @@ def callback_message(callback):
 
 @bot.message_handler(commands=['start'])
 def start(message):
-    bot.send_message(message.chat.id, f'Hello {message.from_user.first_name}')
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    btn1 = types.KeyboardButton('Go to our site')
+    markup.row(btn1)
+    btn2 = types.KeyboardButton('Delete')
+    btn3 = types.KeyboardButton('Edit')
+    markup.row(btn2, btn3)
+    bot.send_message(message.chat.id, f'Hello {message.from_user.first_name}', reply_markup=markup)
+    bot.register_next_step_handler(message, on_click)
+
+
+def on_click(message):
+    if message.text == 'Go to our site':
+        bot.send_message(message.chat.id, 'Website is open')
+    elif message.text == 'Delete':
+        bot.send_message(message.chat.id, 'Deleted')
 
 
 @bot.message_handler(commands=['help'])
 def command_help(message):
-    bot.send_message(message.chat.id, '<b>Help</b> <em><u>information</u></em>', parse_mode='html')
+    bot.send_message(message.chat.id, message.chat.id)
+    # bot.send_message(message.from_user.id, message.chat.id)
+    bot.send_message(message.chat.id, 'Enter your question')
+    bot.register_next_step_handler(message, next_step)
+
+
+def next_step(message):
+    bot.reply_to(message, "Your question was sent")
+    bot.send_message(GROUP_ID,
+                     f"User {message.from_user.id} sent a question: '{message.text}'. Enter <code>/answer "
+                     f"{message.from_user.id} 'answer'</code> to answer", parse_mode='HTML')
 
 
 @bot.message_handler()
@@ -60,6 +82,12 @@ def info(message):
         bot.send_message(message.chat.id, f'Hello {message.from_user.first_name}')
     elif message.text.lower() == "id":
         bot.reply_to(message, f'ID: {message.from_user.id}')
+    elif "/answer" in message.text:
+        text_split = message.text.split(" ")
+        user_id = text_split[1]
+        text = ' '.join(text_split[2:])
+        bot.send_message(user_id, f'Your have got an answer {text}')
+        bot.reply_to(message, 'Your answer was sent')
 
 
 bot.polling(non_stop=True)
