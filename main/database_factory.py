@@ -22,6 +22,6 @@ def add_pending_user(user_id):
 
 def delete_pending_user(user_id):
     data = pd.read_sql('pending_users', engine)
-    index = data[data['user_id'] == int(user_id)].index
+    index = data[data['user_id'] == user_id].index
     data = data.drop(index)
     data.to_sql('pending_users', engine, if_exists='replace', index=False, index_label='id')
