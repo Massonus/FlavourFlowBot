@@ -1,10 +1,14 @@
+import json
 import telebot
 import webbrowser
 import dropbox_factory
 import database_factory
 from config import GROUP_ID, TG_TOKEN
+from database_factory import Database
 
 from telebot import types
+
+database = Database()
 
 bot = telebot.TeleBot(TG_TOKEN)
 
@@ -79,8 +83,31 @@ def next_step(message, user_id):
                      f"\n<b>Message:</b> \"{message.text}\"", reply_markup=markup, parse_mode='HTML')
 
 
-@bot.callback_query_handler(func=lambda callback: True)
-def callback_message(callback):
+@bot.message_handler(commands=['pagination'])
+def pagination(message):
+    page = 1
+    sql_transaction = database.data_list_for_page(tables='product', order='title', page=page,
+                                                  skip_size=1)  # SkipSize - display by one element
+    data = sql_transaction[0][0]  # Rows data
+    count = sql_transaction[2]  # Number of rows
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton(text='Hide', callback_data='unseen'))
+    markup.add(types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '),
+               types.InlineKeyboardButton(text=f'Forward --->',
+                                          callback_data="{\"method\":\"pagination\",\"NumberPage\":" + str(
+                                              page + 1) + ",\"CountPage\":" + str(count) + "}"))
+
+    bot.send_message(message.from_user.id, f'<b>{data[3]}</b>\n\n'
+                                           f'<b>Title:</b> <i>{data[4]}</i>\n'
+                                           f'<b>Email:</b><i>{data[5]}</i>\n'
+                                           f'<b>Site:</b><i> {data[6]}</i>',
+                     parse_mode="HTML", reply_markup=markup)
+
+
+@bot.callback_query_handler(func=lambda call: True)
+def callback_query(callback):
+    req = callback.data.split('_')
+
     if callback.data == 'delete':
         bot.delete_message(callback.message.chat.id, callback.message.message_id)
     elif callback.data == 'edit':
@@ -101,6 +128,44 @@ def callback_message(callback):
         bot.delete_message(GROUP_ID, message_id)
         database_factory.delete_pending_user(user_id)
 
+    elif req[0] == 'unseen':
+        bot.delete_message(callback.message.chat.id, callback.message.message_id)
+    elif 'pagination' in req[0]:
+        json_string = json.loads(req[0])
+        page = json_string['NumberPage']
+
+        sql_transaction = database.data_list_for_page(tables='product', order='title', page=page,
+                                                      skip_size=1)  # SkipSize - display by one element
+        data = sql_transaction[0][0]
+        count = sql_transaction[2]
+
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton(text='Hide', callback_data='unseen'))
+        if page == 1:
+            markup.add(types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '),
+                       types.InlineKeyboardButton(text=f'Forward --->',
+                                                  callback_data="{\"method\":\"pagination\",\"NumberPage\":" + str(
+                                                      page + 1) + ",\"CountPage\":" + str(count) + "}"))
+        elif page == count:
+            markup.add(types.InlineKeyboardButton(text=f'<--- Back',
+                                                  callback_data="{\"method\":\"pagination\",\"NumberPage\":" + str(
+                                                      page - 1) + ",\"CountPage\":" + str(count) + "}"),
+                       types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '))
+        else:
+            markup.add(types.InlineKeyboardButton(text=f'<--- Back',
+                                                  callback_data="{\"method\":\"pagination\",\"NumberPage\":" + str(
+                                                      page - 1) + ",\"CountPage\":" + str(count) + "}"),
+                       types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '),
+                       types.InlineKeyboardButton(text=f'Forward --->',
+                                                  callback_data="{\"method\":\"pagination\",\"NumberPage\":" + str(
+                                                      page + 1) + ",\"CountPage\":" + str(count) + "}"))
+        bot.edit_message_text(f'<b>{data[3]}</b>\n\n'
+                              f'<b>Title:</b> <i>{data[4]}</i>\n'
+                              f'<b>Email:</b><i>{data[5]}</i>\n'
+                              f'<b>Site:</b><i> {data[6]}</i>',
+                              parse_mode="HTML", reply_markup=markup, chat_id=callback.message.chat.id,
+                              message_id=callback.message.message_id)
+
 
 def next_step2(message, chat_id, message_id, user_id):
     bot.send_message(chat_id, f'Your have got an answer: \n<b>{message.text}</b>', parse_mode='HTML')
@@ -117,4 +182,5 @@ def info(message):
         bot.reply_to(message, f'ID: {message.from_user.id}')
 
 
-bot.polling(non_stop=True)
+if __name__ == '__main__':
+    bot.polling(none_stop=True)
