@@ -34,19 +34,6 @@ def redirect(message):
                    reply_markup=markup, caption="text")
 
 
-@bot.callback_query_handler(func=lambda callback: True)
-def callback_message(callback):
-    if callback.data == 'delete':
-        bot.delete_message(callback.message.chat.id, callback.message.message_id)
-    elif callback.data == 'edit':
-        bot.edit_message_caption('Edit', callback.message.chat.id, callback.message.message_id)
-    elif "answer" in callback.data:
-        text_split = callback.data.split("-")
-        chat_id = text_split[0]
-        bot.send_message(callback.message.chat.id, "Enter your answer: ")
-        bot.register_next_step_handler(callback.message, next_step2, chat_id)
-
-
 @bot.message_handler(commands=['start'])
 def start(message):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -78,20 +65,33 @@ def next_step(message):
     bot.reply_to(message, "Your question was sent")
     markup = types.InlineKeyboardMarkup()
     btn1 = types.InlineKeyboardButton('💬 Answer', callback_data=f'{message.chat.id}-answer')
-    btn2 = types.InlineKeyboardButton('❎ Ignore', callback_data='edit')
+    btn2 = types.InlineKeyboardButton('❎ Ignore', callback_data='ignore')
     markup.row(btn1, btn2)
     bot.send_message(GROUP_ID,
                      f"<b>New question was taken!</b>"
                      f"\n<b>From:</b> @{message.from_user.username} ({message.from_user.first_name})"
                      f"\nID: {message.chat.id}"
-                     f"\n<b>Message:</b> \"{message.text}\"",
-                     reply_markup=markup, parse_mode='HTML')
+                     f"\n<b>Message:</b> \"{message.text}\"", reply_markup=markup, parse_mode='HTML')
 
 
-def next_step2(message, chat_id):
+@bot.callback_query_handler(func=lambda callback: True)
+def callback_message(callback):
+    if callback.data == 'delete':
+        bot.delete_message(callback.message.chat.id, callback.message.message_id)
+    elif callback.data == 'edit':
+        bot.edit_message_caption('Edit', callback.message.chat.id, callback.message.message_id)
+    elif "answer" in callback.data:
+        text_split = callback.data.split("-")
+        chat_id = text_split[0]
+        message_id = callback.message.message_id
+        bot.send_message(callback.message.chat.id, "Enter your answer: ")
+        bot.register_next_step_handler(callback.message, next_step2, chat_id, message_id)
+
+
+def next_step2(message, chat_id, message_id):
     bot.send_message(chat_id, f'Your have got an answer: \n<b>{message.text}</b>', parse_mode='HTML')
     bot.reply_to(message, 'Your answer was sent')
-    bot.delete_message(GROUP_ID, message.message_id - 2)
+    bot.delete_message(GROUP_ID, message_id)
 
 
 @bot.message_handler()
