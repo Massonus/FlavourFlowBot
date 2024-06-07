@@ -68,10 +68,7 @@ def get_user_by_username(username):
 
 def get_user_by_telegram_id(user_id):
     data = pd.read_sql('consumer', engine)
-    try:
-        return data.loc[data['telegram_id'] == user_id, 'username'].values[0]
-    except IndexError:
-        return "incorrect"
+    return data.loc[data['telegram_id'] == user_id, 'username'].values[0]
 
 
 def verify_password(username, password):
@@ -83,7 +80,7 @@ def verify_password(username, password):
         return "incorrect", False
 
 
-def add_consumer_telebot_id(username, user_id):
+def change_consumer_telebot_id(username, user_id):
     data = pd.read_sql('consumer', engine)
     data.loc[data['username'] == username, 'telegram_id'] = user_id
     data.to_sql('consumer', engine, if_exists='replace', index=False, index_label='id')

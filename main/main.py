@@ -1,7 +1,7 @@
 import re
 import telebot
 import dropbox_factory
-import database_factory
+import database_factory as db
 from config import GROUP_ID, TG_TOKEN
 from database_factory import Database
 
@@ -14,10 +14,10 @@ bot = telebot.TeleBot(TG_TOKEN)
 
 @bot.message_handler(commands=['start'])
 def start(message):
-    if message.from_user.id in database_factory.get_authorization_users():
+    if message.from_user.id in db.get_authorization_users():
         bot.send_message(message.chat.id,
                          f"Welcome. You are authorized as "
-                         f"{database_factory.get_user_by_telegram_id(message.from_user.id)}!")
+                         f"{db.get_user_by_telegram_id(message.from_user.id)}!")
     else:
         bot.send_message(message.chat.id, "Welcome. You are not authorized! You can do it below")
     main_menu(message)
@@ -27,11 +27,23 @@ def start(message):
 def command_help(message):
     # bot.send_message(message.chat.id, message.chat.id)
     # bot.send_message(message.from_user.id, message.chat.id)
-    if str(message.from_user.id) in database_factory.get_pending_users():
+    if str(message.from_user.id) in db.get_pending_users():
         bot.send_message(message.chat.id, 'You have already sent a message, please wait an answer')
     else:
         bot.send_message(message.chat.id, 'Enter your question')
         bot.register_next_step_handler(message, after_question, message.from_user.id)
+
+
+@bot.message_handler(commands=['logout'])
+def command_help(message):
+    try:
+        username = db.get_user_by_telegram_id(message.from_user.id)
+        db.change_consumer_telebot_id(username, 0)
+        bot.send_message(message.from_user.id, "Successfully logout")
+        main_menu(message)
+    except IndexError:
+        bot.send_message(message.from_user.id, "You are not authorized!")
+        main_menu(message)
 
 
 @bot.message_handler(content_types=['photo'])
@@ -93,19 +105,19 @@ def main_menu(message):
     markup = types.InlineKeyboardMarkup()
     btn1 = types.InlineKeyboardButton('Go to our site', url='http://flavourflow.eu-central-1.elasticbeanstalk.com')
     markup.add(btn1)
-    if message.from_user.id in database_factory.get_authorization_users():
+    if message.from_user.id in db.get_authorization_users():
         btn2 = types.InlineKeyboardButton('Go to catalog', callback_data='1-companies')
         markup.add(btn2)
     else:
-        btn2 = types.InlineKeyboardButton('Registration', callback_data='register')
-        btn3 = types.InlineKeyboardButton('Login', callback_data='login')
+        btn2 = types.InlineKeyboardButton('Login', callback_data='login')
+        btn3 = types.InlineKeyboardButton('Registration', callback_data='register')
         markup.row(btn2, btn3)
     bot.send_message(message.chat.id, "Main menu:", reply_markup=markup)
 
 
 def after_question(message, user_id):
     bot.reply_to(message, "Your question was sent")
-    database_factory.add_pending_user(user_id)
+    db.add_pending_user(user_id)
     markup = types.InlineKeyboardMarkup()
     btn1 = types.InlineKeyboardButton('💬 Answer',
                                       callback_data=f'{message.chat.id}-{message.from_user.id}-{message.message_id}'
@@ -129,12 +141,12 @@ def after_login_username(message):
 
 def after_registration_username(message):
     username = message.text
-    if username not in database_factory.get_consumers_usernames() and re.search(r'^[a-zA-Z][a-zA-Z0-9_]*$',
-                                                                                username) is not None:
+    if username not in db.get_consumers_usernames() and re.search(r'^[a-zA-Z][a-zA-Z0-9_]*$',
+                                                                  username) is not None:
         bot.send_message(message.chat.id, "Enter email")
         bot.register_next_step_handler(message, after_registration_email, username)
 
-    elif username in database_factory.get_consumers_usernames():
+    elif username in db.get_consumers_usernames():
         bot.send_message(message.chat.id, "This username is already in use")
         main_menu(message)
 
@@ -146,12 +158,12 @@ def after_registration_username(message):
 
 def after_registration_email(message, username):
     email = message.text
-    if email not in database_factory.get_consumers_emails() and re.search(r'^[a-z0-9]+[._]?[a-z0-9]+@\w+[.]\w+$',
-                                                                          email) is not None:
+    if email not in db.get_consumers_emails() and re.search(r'^[a-z0-9]+[._]?[a-z0-9]+@\w+[.]\w+$',
+                                                            email) is not None:
         bot.send_message(message.chat.id, "Enter password")
         bot.register_next_step_handler(message, after_registration_password, username, email)
 
-    elif email in database_factory.get_consumers_emails():
+    elif email in db.get_consumers_emails():
         bot.send_message(message.chat.id, "This email is already in use")
         main_menu(message)
 
@@ -175,11 +187,11 @@ def after_registration_password(message, username, email):
 
 def registration_result(message, username, email, password):
     confirm_password = message.text
-    if password == confirm_password and username not in database_factory.get_consumers_usernames():
-        database_factory.add_new_consumer(username, email, password, message.from_user.id)
+    if password == confirm_password and username not in db.get_consumers_usernames():
+        db.add_new_consumer(username, email, password, message.from_user.id)
         bot.send_message(message.chat.id,
                          f"Successful registration. Welcome "
-                         f"{database_factory.get_user_by_telegram_id(message.from_user.id)}!")
+                         f"{db.get_user_by_telegram_id(message.from_user.id)}!")
         main_menu(message)
 
     elif not password == confirm_password:
@@ -188,24 +200,25 @@ def registration_result(message, username, email, password):
 
 
 def after_login_password(message, username):
-    result, is_correct_username = database_factory.get_user_by_username(username)
-    is_correct_password = database_factory.verify_password(result, message.text)
+    result, is_correct_username = db.get_user_by_username(username)
+    is_correct_password = db.verify_password(result, message.text)
 
     if is_correct_username and is_correct_password:
-        database_factory.add_consumer_telebot_id(result, message.from_user.id)
+        db.change_consumer_telebot_id(result, message.from_user.id)
         bot.send_message(message.chat.id, f"Success authorization. Welcome "
-                                          f"{database_factory.get_user_by_telegram_id(message.from_user.id)}!")
+                                          f"{db.get_user_by_telegram_id(message.from_user.id)}!")
         main_menu(message)
 
     else:
         bot.send_message(message.chat.id, "Username or password is incorrect")
+        main_menu(message)
 
 
 def after_answer(message, chat_id, message_id, user_id, question_message_id):
     bot.send_message(chat_id, f'Your have got an answer: \n<b>{message.text}</b>', parse_mode='HTML',
                      reply_to_message_id=question_message_id)
     bot.reply_to(message, 'Your answer was sent')
-    database_factory.delete_pending_user(user_id)
+    db.delete_pending_user(user_id)
     bot.delete_message(GROUP_ID, message_id)
 
 
@@ -227,7 +240,7 @@ def ignore_message(callback):
     message_id = callback.message.message_id
     bot.send_message(chat_id, "Unfortunately, your question was denied", reply_to_message_id=question_message_id)
     bot.delete_message(GROUP_ID, message_id)
-    database_factory.delete_pending_user(user_id)
+    db.delete_pending_user(user_id)
 
 
 def companies_catalog(callback):
