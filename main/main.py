@@ -61,29 +61,15 @@ def on_click(message):
 def command_help(message):
     # bot.send_message(message.chat.id, message.chat.id)
     # bot.send_message(message.from_user.id, message.chat.id)
-    if message.from_user.id in database_factory.get_pending_users():
+    if str(message.from_user.id) in database_factory.get_pending_users():
         bot.send_message(message.chat.id, 'You have already sent a message, please wait an answer')
     else:
         bot.send_message(message.chat.id, 'Enter your question')
         bot.register_next_step_handler(message, after_question, message.from_user.id)
 
 
-def after_question(message, user_id):
-    bot.reply_to(message, "Your question was sent")
-    database_factory.add_pending_user(user_id)
-    markup = types.InlineKeyboardMarkup()
-    btn1 = types.InlineKeyboardButton('💬 Answer', callback_data=f'{message.chat.id}-{message.from_user.id}-answer')
-    btn2 = types.InlineKeyboardButton('❎ Ignore', callback_data=f'{message.chat.id}-{message.from_user.id}-ignore')
-    markup.row(btn1, btn2)
-    bot.send_message(GROUP_ID,
-                     f"<b>New question was taken!</b>"
-                     f"\n<b>From:</b> @{message.from_user.username} ({message.from_user.first_name})"
-                     f"\nID: {message.chat.id}"
-                     f"\n<b>Message:</b> \"{message.text}\"", reply_markup=markup, parse_mode='HTML')
-
-
 @bot.message_handler(commands=['pagination'])
-def pagination(message):
+def start_pagination(message):
     page = 1
     # Number of rows and data for 1 page
     data, count = database.data_list_for_page(tables='company', order='title', page=page,
@@ -110,53 +96,30 @@ def callback_query(callback):
         bot.edit_message_caption('Edit', callback.message.chat.id, callback.message.message_id)
 
     elif "answer" in callback.data:
-        text_split = callback.data.split("-")
-        chat_id = text_split[0]
-        user_id = text_split[1]
-        message_id = callback.message.message_id
-        bot.send_message(callback.message.chat.id, "Enter your answer: ")
-        bot.register_next_step_handler(callback.message, after_answer, chat_id, message_id, user_id)
+        answer_message(callback)
 
     elif "ignore" in callback.data:
-        text_split = callback.data.split("-")
-        chat_id = text_split[0]
-        user_id = text_split[1]
-        message_id = callback.message.message_id
-        bot.send_message(chat_id, "Unfortunately, your answer was denied")
-        bot.delete_message(GROUP_ID, message_id)
-        database_factory.delete_pending_user(user_id)
+        ignore_message(callback)
 
     elif callback.data == "unseen":
         bot.delete_message(callback.message.chat.id, callback.message.message_id)
 
     elif "pagination" in callback.data:
-        page = int(callback.data.split('-')[0])
+        show_companies(callback)
 
-        # Number of rows and data for 1 page
-        data, count = database.data_list_for_page(tables='company', order='title', page=page,
-                                                  skip_size=1)  # SkipSize - display by one element
 
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton(text='Hide', callback_data='unseen'))
-
-        if page == 1:
-            markup.add(types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '),
-                       types.InlineKeyboardButton(text=f'Forward --->', callback_data=f"{page + 1}-pagination"))
-
-        elif page == count:
-            markup.add(types.InlineKeyboardButton(text=f'<--- Back', callback_data=f"{page - 1}-pagination"),
-                       types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '))
-        else:
-            markup.add(types.InlineKeyboardButton(text=f'<--- Back', callback_data=f"{page - 1}-pagination"),
-                       types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '),
-                       types.InlineKeyboardButton(text=f'Forward --->', callback_data=f"{page + 1}-pagination"))
-
-        bot.edit_message_text(f'<b>{data[3]}</b>\n\n'
-                              f'<b>Title:</b> <i>{data[4]}</i>\n'
-                              f'<b>Email:</b><i>{data[5]}</i>\n'
-                              f'<b>Site:</b><i> {data[6]}</i>',
-                              parse_mode="HTML", reply_markup=markup, chat_id=callback.message.chat.id,
-                              message_id=callback.message.message_id)
+def after_question(message, user_id):
+    bot.reply_to(message, "Your question was sent")
+    database_factory.add_pending_user(user_id)
+    markup = types.InlineKeyboardMarkup()
+    btn1 = types.InlineKeyboardButton('💬 Answer', callback_data=f'{message.chat.id}-{message.from_user.id}-answer')
+    btn2 = types.InlineKeyboardButton('❎ Ignore', callback_data=f'{message.chat.id}-{message.from_user.id}-ignore')
+    markup.row(btn1, btn2)
+    bot.send_message(GROUP_ID,
+                     f"<b>New question was taken!</b>"
+                     f"\n<b>From:</b> @{message.from_user.username} ({message.from_user.first_name})"
+                     f"\nID: {message.chat.id}"
+                     f"\n<b>Message:</b> \"{message.text}\"", reply_markup=markup, parse_mode='HTML')
 
 
 def after_answer(message, chat_id, message_id, user_id):
@@ -164,6 +127,55 @@ def after_answer(message, chat_id, message_id, user_id):
     bot.reply_to(message, 'Your answer was sent')
     database_factory.delete_pending_user(user_id)
     bot.delete_message(GROUP_ID, message_id)
+
+
+def answer_message(callback):
+    text_split = callback.data.split("-")
+    chat_id = text_split[0]
+    user_id = text_split[1]
+    message_id = callback.message.message_id
+    bot.send_message(callback.message.chat.id, "Enter your answer: ")
+    bot.register_next_step_handler(callback.message, after_answer, chat_id, message_id, user_id)
+
+
+def ignore_message(callback):
+    text_split = callback.data.split("-")
+    chat_id = text_split[0]
+    user_id = text_split[1]
+    message_id = callback.message.message_id
+    bot.send_message(chat_id, "Unfortunately, your question was denied")
+    bot.delete_message(GROUP_ID, message_id)
+    database_factory.delete_pending_user(user_id)
+
+
+def show_companies(callback):
+    page = int(callback.data.split('-')[0])
+
+    # Number of rows and data for 1 page
+    data, count = database.data_list_for_page(tables='company', order='title', page=page,
+                                              skip_size=1)  # SkipSize - display by one element
+
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton(text='Hide', callback_data='unseen'))
+
+    if page == 1:
+        markup.add(types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '),
+                   types.InlineKeyboardButton(text=f'Forward --->', callback_data=f"{page + 1}-pagination"))
+
+    elif page == count:
+        markup.add(types.InlineKeyboardButton(text=f'<--- Back', callback_data=f"{page - 1}-pagination"),
+                   types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '))
+    else:
+        markup.add(types.InlineKeyboardButton(text=f'<--- Back', callback_data=f"{page - 1}-pagination"),
+                   types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '),
+                   types.InlineKeyboardButton(text=f'Forward --->', callback_data=f"{page + 1}-pagination"))
+
+    bot.edit_message_text(f'<b>{data[3]}</b>\n\n'
+                          f'<b>Title:</b> <i>{data[4]}</i>\n'
+                          f'<b>Email:</b><i>{data[5]}</i>\n'
+                          f'<b>Site:</b><i> {data[6]}</i>',
+                          parse_mode="HTML", reply_markup=markup, chat_id=callback.message.chat.id,
+                          message_id=callback.message.message_id)
 
 
 @bot.message_handler()
