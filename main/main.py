@@ -86,10 +86,10 @@ def next_step(message, user_id):
 @bot.message_handler(commands=['pagination'])
 def pagination(message):
     page = 1
-    sql_transaction = database.data_list_for_page(tables='product', order='title', page=page,
-                                                  skip_size=1)  # SkipSize - display by one element
-    data = sql_transaction[0][0]  # Rows data
-    count = sql_transaction[2]  # Number of rows
+    # Number of rows and data for 1 page
+    data, count = database.data_list_for_page(tables='product', order='title', page=page,
+                                              skip_size=1)  # SkipSize - display by one element
+
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton(text='Hide', callback_data='unseen'))
     markup.add(types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '),
@@ -106,41 +106,43 @@ def pagination(message):
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(callback):
-    req = callback.data.split('_')
-
     if callback.data == 'delete':
         bot.delete_message(callback.message.chat.id, callback.message.message_id)
+
     elif callback.data == 'edit':
         bot.edit_message_caption('Edit', callback.message.chat.id, callback.message.message_id)
+
     elif "answer" in callback.data:
         text_split = callback.data.split("-")
         chat_id = text_split[0]
-        message_id = callback.message.message_id
         user_id = text_split[1]
+        message_id = callback.message.message_id
         bot.send_message(callback.message.chat.id, "Enter your answer: ")
         bot.register_next_step_handler(callback.message, next_step2, chat_id, message_id, user_id)
+
     elif "ignore" in callback.data:
         text_split = callback.data.split("-")
         chat_id = text_split[0]
-        message_id = callback.message.message_id
         user_id = text_split[1]
+        message_id = callback.message.message_id
         bot.send_message(chat_id, "Unfortunately, your answer was denied")
         bot.delete_message(GROUP_ID, message_id)
         database_factory.delete_pending_user(user_id)
 
-    elif req[0] == 'unseen':
+    elif callback.data == "unseen":
         bot.delete_message(callback.message.chat.id, callback.message.message_id)
-    elif 'pagination' in req[0]:
-        json_string = json.loads(req[0])
+
+    elif "pagination" in callback.data:
+        json_string = json.loads(callback.data.split('_')[0])
         page = json_string['NumberPage']
 
-        sql_transaction = database.data_list_for_page(tables='product', order='title', page=page,
-                                                      skip_size=1)  # SkipSize - display by one element
-        data = sql_transaction[0][0]
-        count = sql_transaction[2]
+        # Number of rows and data for 1 page
+        data, count = database.data_list_for_page(tables='product', order='title', page=page,
+                                                  skip_size=1)  # SkipSize - display by one element
 
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton(text='Hide', callback_data='unseen'))
+
         if page == 1:
             markup.add(types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '),
                        types.InlineKeyboardButton(text=f'Forward --->',

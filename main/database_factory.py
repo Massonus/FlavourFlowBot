@@ -23,7 +23,7 @@ class Database():
         res = self.cursor.fetchall()
         self.cursor.execute(f"""SELECT Count(*) FROM {schema}.{tables} AS o {wheres};""")
         count = self.cursor.fetchone()[0]
-        return res, len(res), count
+        return res[0], count
 
 
 def get_pending_users():
