@@ -77,14 +77,14 @@ def start_pagination(message):
 
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton(text='Hide', callback_data='unseen'))
+    markup.add(
+        types.InlineKeyboardButton(text='Products of this company', callback_data=f"1-{data[3]}-{page}-products"))
     markup.add(types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '),
-               types.InlineKeyboardButton(text=f'Forward --->', callback_data=f"{page + 1}-pagination"))
+               types.InlineKeyboardButton(text=f'Forward --->', callback_data=f"{page + 1}-companies"))
 
-    bot.send_message(message.from_user.id, f'<b>{data[3]}</b>\n\n'
-                                           f'<b>Title:</b> <i>{data[4]}</i>\n'
-                                           f'<b>Email:</b><i>{data[5]}</i>\n'
-                                           f'<b>Site:</b><i> {data[6]}</i>',
-                     parse_mode="HTML", reply_markup=markup)
+    bot.send_photo(message.from_user.id, photo=data[5], caption=f'<b>{data[6]}</b>\n\n'
+                                                                f'<b>Description:</b> <i>{data[4]}</i>\n',
+                   parse_mode="HTML", reply_markup=markup)
 
 
 @bot.callback_query_handler(func=lambda call: True)
@@ -104,8 +104,11 @@ def callback_query(callback):
     elif callback.data == "unseen":
         bot.delete_message(callback.message.chat.id, callback.message.message_id)
 
-    elif "pagination" in callback.data:
+    elif "companies" in callback.data:
         show_companies(callback)
+
+    elif "products" in callback.data:
+        show_products(callback)
 
 
 def after_question(message, user_id):
@@ -157,25 +160,65 @@ def show_companies(callback):
 
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton(text='Hide', callback_data='unseen'))
+    markup.add(
+        types.InlineKeyboardButton(text='Products of this company', callback_data=f"1-{data[3]}-{page}-products"))
 
     if page == 1:
         markup.add(types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '),
-                   types.InlineKeyboardButton(text=f'Forward --->', callback_data=f"{page + 1}-pagination"))
+                   types.InlineKeyboardButton(text=f'Forward --->', callback_data=f"{page + 1}-companies"))
 
     elif page == count:
-        markup.add(types.InlineKeyboardButton(text=f'<--- Back', callback_data=f"{page - 1}-pagination"),
+        markup.add(types.InlineKeyboardButton(text=f'<--- Back', callback_data=f"{page - 1}-companies"),
                    types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '))
     else:
-        markup.add(types.InlineKeyboardButton(text=f'<--- Back', callback_data=f"{page - 1}-pagination"),
+        markup.add(types.InlineKeyboardButton(text=f'<--- Back', callback_data=f"{page - 1}-companies"),
                    types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '),
-                   types.InlineKeyboardButton(text=f'Forward --->', callback_data=f"{page + 1}-pagination"))
+                   types.InlineKeyboardButton(text=f'Forward --->', callback_data=f"{page + 1}-companies"))
 
-    bot.edit_message_text(f'<b>{data[3]}</b>\n\n'
-                          f'<b>Title:</b> <i>{data[4]}</i>\n'
-                          f'<b>Email:</b><i>{data[5]}</i>\n'
-                          f'<b>Site:</b><i> {data[6]}</i>',
-                          parse_mode="HTML", reply_markup=markup, chat_id=callback.message.chat.id,
-                          message_id=callback.message.message_id)
+    bot.delete_message(callback.message.chat.id, callback.message.message_id)
+    bot.send_photo(callback.message.chat.id, photo=data[5], caption=f'<b>{data[6]}</b>\n\n'
+                                                                    f'<b>Description:</b> <i>{data[4]}</i>\n',
+                   parse_mode="HTML", reply_markup=markup)
+
+
+def show_products(callback):
+    text_split = callback.data.split('-')
+    page = int(text_split[0])
+    company_id = int(text_split[1])
+    company_page = int(text_split[2])
+
+    # Number of rows and data for 1 page
+    data, count = database.data_list_for_page(tables='product', order='title', page=page,
+                                              skip_size=1,  # SkipSize - display by one element
+                                              wheres=f"WHERE company_id = {company_id}")
+
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton(text='Hide', callback_data='unseen'))
+    markup.add(types.InlineKeyboardButton(text='Bask to companies', callback_data=f"{company_page}-companies"))
+
+    add_to_basket = types.InlineKeyboardButton('Add to basket', callback_data=' ')
+    add_to_wishlist = types.InlineKeyboardButton('Add to wishlist', callback_data=' ')
+    markup.row(add_to_basket, add_to_wishlist)
+
+    if page == 1:
+        markup.add(types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '),
+                   types.InlineKeyboardButton(text=f'Forward --->',
+                                              callback_data=f"{page + 1}-{company_id}-{page}-products"))
+
+    elif page == count:
+        markup.add(
+            types.InlineKeyboardButton(text=f'<--- Back', callback_data=f"{page - 1}-{company_id}-{page}-products"),
+            types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '))
+    else:
+        markup.add(
+            types.InlineKeyboardButton(text=f'<--- Back', callback_data=f"{page - 1}-{company_id}-{page}-products"),
+            types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '),
+            types.InlineKeyboardButton(text=f'Forward --->', callback_data=f"{page + 1}-{company_id}-{page}-products"))
+
+    bot.delete_message(callback.message.chat.id, callback.message.message_id)
+    bot.send_photo(callback.message.chat.id, photo=data[5], caption=f'<b>{data[6]}</b>\n\n'
+                                                                    f'<b>Description:</b> <i>{data[4]}</i>\n',
+                   parse_mode="HTML", reply_markup=markup)
 
 
 @bot.message_handler()
