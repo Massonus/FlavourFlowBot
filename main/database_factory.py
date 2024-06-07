@@ -13,7 +13,7 @@ class Database():
                                      password='root', host='localhost', port=5432)
         self.cursor = self.conn.cursor()
 
-    def data_list_for_page(self, tables, order, schema='public', page=1, skip_size=1, wheres='WHERE company_id = 5'):
+    def data_list_for_page(self, tables, order, schema='public', page=1, skip_size=1, wheres=''):
         skips_page = ((page - 1) * skip_size)
         sql = f"""SELECT * FROM {schema}.{tables} AS o
         {wheres}

@@ -1,4 +1,3 @@
-import json
 import telebot
 import webbrowser
 import dropbox_factory
@@ -66,10 +65,10 @@ def command_help(message):
         bot.send_message(message.chat.id, 'You have already sent a message, please wait an answer')
     else:
         bot.send_message(message.chat.id, 'Enter your question')
-        bot.register_next_step_handler(message, next_step, message.from_user.id)
+        bot.register_next_step_handler(message, after_question, message.from_user.id)
 
 
-def next_step(message, user_id):
+def after_question(message, user_id):
     bot.reply_to(message, "Your question was sent")
     database_factory.add_pending_user(user_id)
     markup = types.InlineKeyboardMarkup()
@@ -87,7 +86,7 @@ def next_step(message, user_id):
 def pagination(message):
     page = 1
     # Number of rows and data for 1 page
-    data, count = database.data_list_for_page(tables='product', order='title', page=page,
+    data, count = database.data_list_for_page(tables='company', order='title', page=page,
                                               skip_size=1)  # SkipSize - display by one element
 
     markup = types.InlineKeyboardMarkup()
@@ -116,7 +115,7 @@ def callback_query(callback):
         user_id = text_split[1]
         message_id = callback.message.message_id
         bot.send_message(callback.message.chat.id, "Enter your answer: ")
-        bot.register_next_step_handler(callback.message, next_step2, chat_id, message_id, user_id)
+        bot.register_next_step_handler(callback.message, after_answer, chat_id, message_id, user_id)
 
     elif "ignore" in callback.data:
         text_split = callback.data.split("-")
@@ -134,7 +133,7 @@ def callback_query(callback):
         page = int(callback.data.split('-')[0])
 
         # Number of rows and data for 1 page
-        data, count = database.data_list_for_page(tables='product', order='title', page=page,
+        data, count = database.data_list_for_page(tables='company', order='title', page=page,
                                                   skip_size=1)  # SkipSize - display by one element
 
         markup = types.InlineKeyboardMarkup()
@@ -160,7 +159,7 @@ def callback_query(callback):
                               message_id=callback.message.message_id)
 
 
-def next_step2(message, chat_id, message_id, user_id):
+def after_answer(message, chat_id, message_id, user_id):
     bot.send_message(chat_id, f'Your have got an answer: \n<b>{message.text}</b>', parse_mode='HTML')
     bot.reply_to(message, 'Your answer was sent')
     database_factory.delete_pending_user(user_id)
