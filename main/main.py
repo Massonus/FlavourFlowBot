@@ -1,5 +1,4 @@
 import telebot
-import webbrowser
 import dropbox_factory
 import database_factory
 from config import GROUP_ID, TG_TOKEN
@@ -10,11 +9,6 @@ from telebot import types
 database = Database()
 
 bot = telebot.TeleBot(TG_TOKEN)
-
-
-@bot.message_handler(commands=['site', 'website'])
-def redirect(message):
-    webbrowser.open_new_tab('http://flavourflow.eu-central-1.elasticbeanstalk.com')
 
 
 @bot.message_handler(content_types=['photo'])
@@ -43,18 +37,37 @@ def start(message):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     btn1 = types.KeyboardButton('Go to our site')
     markup.row(btn1)
-    btn2 = types.KeyboardButton('Delete')
-    btn3 = types.KeyboardButton('Edit')
-    markup.row(btn2, btn3)
+    if message.from_user.id in database_factory.get_authorization_users():
+        bot.send_message(message.chat.id, "Welcome. You are authorized!")
+    else:
+        btn2 = types.KeyboardButton('Registration')
+        btn3 = types.KeyboardButton('Login')
+        markup.row(btn2, btn3)
     bot.send_message(message.chat.id, f'Hello {message.from_user.first_name}', reply_markup=markup)
     bot.register_next_step_handler(message, on_click)
 
 
 def on_click(message):
-    if message.text == 'Go to our site':
-        bot.send_message(message.chat.id, 'Website is open')
-    elif message.text == 'Delete':
+    if message.text == 'Login':
+        bot.send_message(message.chat.id, 'Enter your username from Flavour Flow site')
+        bot.register_next_step_handler(message, after_username)
+    elif message.text == 'Registration':
         bot.send_message(message.chat.id, 'Deleted')
+
+
+def after_username(message):
+    username = message.text
+    bot.send_message(message.chat.id, "Enter password")
+    bot.register_next_step_handler(message, after_password, username)
+
+
+def after_password(message, username):
+    if database_factory.get_user_by_username(username) == "empty":
+        bot.send_message(message.chat.id, "Incorrect username")
+    elif not database_factory.compare_passwords(message.text, username):
+        bot.send_message(message.chat.id, "Incorrect password")
+    else:
+        bot.send_message(message.chat.id, "Success registration")
 
 
 @bot.message_handler(commands=['help'])

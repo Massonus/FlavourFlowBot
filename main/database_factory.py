@@ -3,6 +3,7 @@ import psycopg2
 import pandas as pd
 from sqlalchemy import exc
 from config import postgres_username, postgres_password
+from passlib.hash import bcrypt
 
 engine = sqlalchemy.create_engine(f"postgresql+psycopg2://{postgres_username}:{postgres_password}@localhost:5432/Test")
 
@@ -26,6 +27,17 @@ class Database():
         return res[0], count
 
 
+def get_authorization_users():
+    data = pd.read_sql('consumer', engine)
+    user_id = []
+    try:
+        user_id = data['telegram_id'].values.tolist()
+    except KeyError:
+        data['telegram_id'] = [0] * len(data)
+        data.to_sql('consumer', engine, if_exists='replace', index=False, index_label='id')
+    return user_id
+
+
 def get_pending_users():
     try:
         data = pd.read_sql('pending_users', engine)
@@ -34,6 +46,26 @@ def get_pending_users():
         data.to_sql('pending_users', engine, if_exists='append', index=False, index_label='id')
     user_id = data['user_id'].values.tolist()
     return user_id
+
+
+def get_user_by_username(username):
+    data = pd.read_sql('consumer', engine)
+    dict_username = data[data['username'] == username].to_dict().get('username')
+    if dict_username == {}:
+        return "empty"
+    for val in dict_username.values():
+        return val
+
+
+def get_user_password(username):
+    data = pd.read_sql('consumer', engine)
+    dict_username = data[data['username'] == username].to_dict().get('password')
+    for val in dict_username.values():
+        return val
+
+
+def compare_passwords(password, username):
+    return bcrypt.verify(password, get_user_password(username))
 
 
 def add_pending_user(user_id):
