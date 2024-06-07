@@ -39,7 +39,7 @@ def get_dbx():
     try:
         dbx = dropbox.Dropbox(token)
         dbx.users_get_current_account()
-    except dropbox.exceptions.AuthError as e:
+    except dropbox.exceptions.AuthError:
         return dbx_init_token()
     else:
         return dbx
