@@ -1,3 +1,4 @@
+import re
 import telebot
 import dropbox_factory
 import database_factory
@@ -136,12 +137,18 @@ def after_registration_username(message):
 
 def after_registration_email(message, username):
     email = message.text
-    if email in database_factory.get_consumers_emails():
-        bot.send_message(message.chat.id, "This email is already in use")
-        main_menu(message)
-    else:
+    if email not in database_factory.get_consumers_emails() and re.search(r'^[a-z0-9]+[._]?[a-z0-9]+@\w+[.]\w+$',
+                                                                          email) is not None:
         bot.send_message(message.chat.id, "Enter password")
         bot.register_next_step_handler(message, after_registration_password, username, email)
+
+    elif email in database_factory.get_consumers_emails():
+        bot.send_message(message.chat.id, "This email is already in use")
+        main_menu(message)
+
+    elif re.search(r'^[a-z0-9]+[._]?[a-z0-9]+@\w+[.]\w+$', email) is None:
+        bot.send_message(message.chat.id, "Incorrect email")
+        main_menu(message)
 
 
 def after_registration_password(message, username, email):
