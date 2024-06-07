@@ -115,8 +115,12 @@ def after_question(message, user_id):
     bot.reply_to(message, "Your question was sent")
     database_factory.add_pending_user(user_id)
     markup = types.InlineKeyboardMarkup()
-    btn1 = types.InlineKeyboardButton('💬 Answer', callback_data=f'{message.chat.id}-{message.from_user.id}-answer')
-    btn2 = types.InlineKeyboardButton('❎ Ignore', callback_data=f'{message.chat.id}-{message.from_user.id}-ignore')
+    btn1 = types.InlineKeyboardButton('💬 Answer',
+                                      callback_data=f'{message.chat.id}-{message.from_user.id}-{message.message_id}'
+                                                    f'-answer')
+    btn2 = types.InlineKeyboardButton('❎ Ignore',
+                                      callback_data=f'{message.chat.id}-{message.from_user.id}-{message.message_id}'
+                                                    f'-ignore')
     markup.row(btn1, btn2)
     bot.send_message(GROUP_ID,
                      f"<b>New question was taken!</b>"
@@ -125,8 +129,9 @@ def after_question(message, user_id):
                      f"\n<b>Message:</b> \"{message.text}\"", reply_markup=markup, parse_mode='HTML')
 
 
-def after_answer(message, chat_id, message_id, user_id):
-    bot.send_message(chat_id, f'Your have got an answer: \n<b>{message.text}</b>', parse_mode='HTML')
+def after_answer(message, chat_id, message_id, user_id, question_message_id):
+    bot.send_message(chat_id, f'Your have got an answer: \n<b>{message.text}</b>', parse_mode='HTML',
+                     reply_to_message_id=question_message_id)
     bot.reply_to(message, 'Your answer was sent')
     database_factory.delete_pending_user(user_id)
     bot.delete_message(GROUP_ID, message_id)
@@ -136,17 +141,19 @@ def answer_message(callback):
     text_split = callback.data.split("-")
     chat_id = text_split[0]
     user_id = text_split[1]
+    question_message_id = text_split[2]
     message_id = callback.message.message_id
     bot.send_message(callback.message.chat.id, "Enter your answer: ")
-    bot.register_next_step_handler(callback.message, after_answer, chat_id, message_id, user_id)
+    bot.register_next_step_handler(callback.message, after_answer, chat_id, message_id, user_id, question_message_id)
 
 
 def ignore_message(callback):
     text_split = callback.data.split("-")
     chat_id = text_split[0]
     user_id = text_split[1]
+    question_message_id = text_split[2]
     message_id = callback.message.message_id
-    bot.send_message(chat_id, "Unfortunately, your question was denied")
+    bot.send_message(chat_id, "Unfortunately, your question was denied", reply_to_message_id=question_message_id)
     bot.delete_message(GROUP_ID, message_id)
     database_factory.delete_pending_user(user_id)
 
@@ -160,6 +167,7 @@ def show_companies(callback):
 
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton(text='Hide', callback_data='unseen'))
+
     markup.add(
         types.InlineKeyboardButton(text='Products of this company', callback_data=f"1-{data[3]}-{page}-products"))
 
