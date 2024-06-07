@@ -93,9 +93,7 @@ def pagination(message):
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton(text='Hide', callback_data='unseen'))
     markup.add(types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '),
-               types.InlineKeyboardButton(text=f'Forward --->',
-                                          callback_data="{\"method\":\"pagination\",\"NumberPage\":" + str(
-                                              page + 1) + ",\"CountPage\":" + str(count) + "}"))
+               types.InlineKeyboardButton(text=f'Forward --->', callback_data=f"{page + 1}-pagination"))
 
     bot.send_message(message.from_user.id, f'<b>{data[3]}</b>\n\n'
                                            f'<b>Title:</b> <i>{data[4]}</i>\n'
@@ -133,8 +131,7 @@ def callback_query(callback):
         bot.delete_message(callback.message.chat.id, callback.message.message_id)
 
     elif "pagination" in callback.data:
-        json_string = json.loads(callback.data.split('_')[0])
-        page = json_string['NumberPage']
+        page = int(callback.data.split('-')[0])
 
         # Number of rows and data for 1 page
         data, count = database.data_list_for_page(tables='product', order='title', page=page,
@@ -145,22 +142,16 @@ def callback_query(callback):
 
         if page == 1:
             markup.add(types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '),
-                       types.InlineKeyboardButton(text=f'Forward --->',
-                                                  callback_data="{\"method\":\"pagination\",\"NumberPage\":" + str(
-                                                      page + 1) + ",\"CountPage\":" + str(count) + "}"))
+                       types.InlineKeyboardButton(text=f'Forward --->', callback_data=f"{page + 1}-pagination"))
+
         elif page == count:
-            markup.add(types.InlineKeyboardButton(text=f'<--- Back',
-                                                  callback_data="{\"method\":\"pagination\",\"NumberPage\":" + str(
-                                                      page - 1) + ",\"CountPage\":" + str(count) + "}"),
+            markup.add(types.InlineKeyboardButton(text=f'<--- Back', callback_data=f"{page - 1}-pagination"),
                        types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '))
         else:
-            markup.add(types.InlineKeyboardButton(text=f'<--- Back',
-                                                  callback_data="{\"method\":\"pagination\",\"NumberPage\":" + str(
-                                                      page - 1) + ",\"CountPage\":" + str(count) + "}"),
+            markup.add(types.InlineKeyboardButton(text=f'<--- Back', callback_data=f"{page - 1}-pagination"),
                        types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '),
-                       types.InlineKeyboardButton(text=f'Forward --->',
-                                                  callback_data="{\"method\":\"pagination\",\"NumberPage\":" + str(
-                                                      page + 1) + ",\"CountPage\":" + str(count) + "}"))
+                       types.InlineKeyboardButton(text=f'Forward --->', callback_data=f"{page + 1}-pagination"))
+
         bot.edit_message_text(f'<b>{data[3]}</b>\n\n'
                               f'<b>Title:</b> <i>{data[4]}</i>\n'
                               f'<b>Email:</b><i>{data[5]}</i>\n'
