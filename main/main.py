@@ -11,6 +11,26 @@ database = Database()
 bot = telebot.TeleBot(TG_TOKEN)
 
 
+@bot.message_handler(commands=['start'])
+def start(message):
+    if message.from_user.id in database_factory.get_authorization_users():
+        bot.send_message(message.chat.id, "Welcome. You are authorized!")
+    else:
+        bot.send_message(message.chat.id, "Welcome. You are not authorized! You can do it below")
+    main_menu(message)
+
+
+@bot.message_handler(commands=['help'])
+def command_help(message):
+    # bot.send_message(message.chat.id, message.chat.id)
+    # bot.send_message(message.from_user.id, message.chat.id)
+    if str(message.from_user.id) in database_factory.get_pending_users():
+        bot.send_message(message.chat.id, 'You have already sent a message, please wait an answer')
+    else:
+        bot.send_message(message.chat.id, 'Enter your question')
+        bot.register_next_step_handler(message, after_question, message.from_user.id)
+
+
 @bot.message_handler(content_types=['photo'])
 def handle_docs_photo(message):
     photo_id = bot.get_file(message.photo[len(message.photo) - 1].file_id).file_id
@@ -32,63 +52,6 @@ def redirect(message):
                    reply_markup=markup, caption="text")
 
 
-@bot.message_handler(commands=['start'])
-def start(message):
-    if message.from_user.id in database_factory.get_authorization_users():
-        bot.send_message(message.chat.id, "Welcome. You are authorized!")
-    else:
-        bot.send_message(message.chat.id, "Welcome. You are not authorized! You can do it below")
-    main_menu(message)
-
-
-def after_username(message):
-    username = message.text
-    bot.send_message(message.chat.id, "Enter password")
-    bot.register_next_step_handler(message, after_password, username)
-
-
-def after_password(message, username):
-    result, is_correct_username = database_factory.get_user_by_username(username)
-    is_correct_password = database_factory.verify_password(result, message.text)
-
-    if is_correct_username and is_correct_password:
-        database_factory.add_consumer_telebot_id(result, message.from_user.id)
-        bot.send_message(message.chat.id, "Success registration")
-        main_menu(message)
-    else:
-        bot.send_message(message.chat.id, "Username or password is incorrect")
-
-
-@bot.message_handler(commands=['help'])
-def command_help(message):
-    # bot.send_message(message.chat.id, message.chat.id)
-    # bot.send_message(message.from_user.id, message.chat.id)
-    if str(message.from_user.id) in database_factory.get_pending_users():
-        bot.send_message(message.chat.id, 'You have already sent a message, please wait an answer')
-    else:
-        bot.send_message(message.chat.id, 'Enter your question')
-        bot.register_next_step_handler(message, after_question, message.from_user.id)
-
-
-@bot.message_handler(commands=['pagination'])
-def start_pagination(message):
-    page = 1
-    # Number of rows and data for 1 page
-    data, count = database.data_list_for_page(tables='company', order='title', page=page,
-                                              skip_size=1)  # SkipSize - display by one element
-
-    markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton(text='Hide', callback_data='unseen'))
-    markup.add(
-        types.InlineKeyboardButton(text='Products of this company', callback_data=f"1-{data[3]}-{page}-products"))
-    markup.add(types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '),
-               types.InlineKeyboardButton(text=f'Forward --->', callback_data=f"{page + 1}-companies"))
-
-    bot.send_photo(message.from_user.id, photo=data[5], caption=f'<b>{data[6]}</b>\n\n'
-                                                                f'<b>Description:</b> <i>{data[4]}</i>\n',
-                   parse_mode="HTML", reply_markup=markup)
-
-
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(callback):
     if callback.data == 'delete':
@@ -107,15 +70,18 @@ def callback_query(callback):
         bot.delete_message(callback.message.chat.id, callback.message.message_id)
 
     elif "companies" in callback.data:
-        show_companies(callback)
+        companies_catalog(callback)
 
     elif "products" in callback.data:
-        show_products(callback)
+        products_catalog(callback)
 
     elif callback.data == "login":
         bot.delete_message(callback.message.chat.id, callback.message.message_id)
         bot.send_message(callback.message.chat.id, 'Enter your username from Flavour Flow site')
-        bot.register_next_step_handler(callback.message, after_username)
+        bot.register_next_step_handler(callback.message, after_login_username)
+
+    elif callback.data == "register":
+        bot.delete_message(callback.message.chat.id, callback.message.message_id)
 
 
 def main_menu(message):
@@ -150,6 +116,24 @@ def after_question(message, user_id):
                      f"\n<b>Message:</b> \"{message.text}\"", reply_markup=markup, parse_mode='HTML')
 
 
+def after_login_username(message):
+    username = message.text
+    bot.send_message(message.chat.id, "Enter password")
+    bot.register_next_step_handler(message, after_login_password, username)
+
+
+def after_login_password(message, username):
+    result, is_correct_username = database_factory.get_user_by_username(username)
+    is_correct_password = database_factory.verify_password(result, message.text)
+
+    if is_correct_username and is_correct_password:
+        database_factory.add_consumer_telebot_id(result, message.from_user.id)
+        bot.send_message(message.chat.id, "Success registration")
+        main_menu(message)
+    else:
+        bot.send_message(message.chat.id, "Username or password is incorrect")
+
+
 def after_answer(message, chat_id, message_id, user_id, question_message_id):
     bot.send_message(chat_id, f'Your have got an answer: \n<b>{message.text}</b>', parse_mode='HTML',
                      reply_to_message_id=question_message_id)
@@ -179,7 +163,7 @@ def ignore_message(callback):
     database_factory.delete_pending_user(user_id)
 
 
-def show_companies(callback):
+def companies_catalog(callback):
     page = int(callback.data.split('-')[0])
 
     # Number of rows and data for 1 page
@@ -210,7 +194,7 @@ def show_companies(callback):
                    parse_mode="HTML", reply_markup=markup)
 
 
-def show_products(callback):
+def products_catalog(callback):
     text_split = callback.data.split('-')
     page = int(text_split[0])
     company_id = int(text_split[1])
