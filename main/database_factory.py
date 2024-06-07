@@ -50,22 +50,19 @@ def get_pending_users():
 
 def get_user_by_username(username):
     data = pd.read_sql('consumer', engine)
-    dict_username = data[data['username'] == username].to_dict().get('username')
-    if dict_username == {}:
-        return "empty"
-    for val in dict_username.values():
-        return val
+    try:
+        return data.loc[data['username'] == username, 'username'].values[0], True
+    except IndexError:
+        return "incorrect", False
 
 
-def get_user_password(username):
+def verify_password(username, password):
     data = pd.read_sql('consumer', engine)
-    dict_username = data[data['username'] == username].to_dict().get('password')
-    for val in dict_username.values():
-        return val
-
-
-def compare_passwords(password, username):
-    return bcrypt.verify(password, get_user_password(username))
+    try:
+        db_password = data.loc[data['username'] == username, 'password'].values[0]
+        return bcrypt.verify(password, db_password)
+    except IndexError:
+        return "incorrect", False
 
 
 def add_pending_user(user_id):

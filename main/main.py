@@ -62,12 +62,13 @@ def after_username(message):
 
 
 def after_password(message, username):
-    if database_factory.get_user_by_username(username) == "empty":
-        bot.send_message(message.chat.id, "Incorrect username")
-    elif not database_factory.compare_passwords(message.text, username):
-        bot.send_message(message.chat.id, "Incorrect password")
-    else:
+    result, is_correct_username = database_factory.get_user_by_username(username)
+    is_correct_password = database_factory.verify_password(result, message.text)
+
+    if is_correct_username and is_correct_password:
         bot.send_message(message.chat.id, "Success registration")
+    else:
+        bot.send_message(message.chat.id, "Username or password is incorrect")
 
 
 @bot.message_handler(commands=['help'])
