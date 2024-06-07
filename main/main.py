@@ -34,25 +34,11 @@ def redirect(message):
 
 @bot.message_handler(commands=['start'])
 def start(message):
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    btn1 = types.KeyboardButton('Go to our site')
-    markup.row(btn1)
     if message.from_user.id in database_factory.get_authorization_users():
         bot.send_message(message.chat.id, "Welcome. You are authorized!")
     else:
-        btn2 = types.KeyboardButton('Registration')
-        btn3 = types.KeyboardButton('Login')
-        markup.row(btn2, btn3)
-    bot.send_message(message.chat.id, f'Hello {message.from_user.first_name}', reply_markup=markup)
-    bot.register_next_step_handler(message, on_click)
-
-
-def on_click(message):
-    if message.text == 'Login':
-        bot.send_message(message.chat.id, 'Enter your username from Flavour Flow site')
-        bot.register_next_step_handler(message, after_username)
-    elif message.text == 'Registration':
-        bot.send_message(message.chat.id, 'Deleted')
+        bot.send_message(message.chat.id, "Welcome. You are not authorized! You can do it below")
+    main_menu(message)
 
 
 def after_username(message):
@@ -66,8 +52,9 @@ def after_password(message, username):
     is_correct_password = database_factory.verify_password(result, message.text)
 
     if is_correct_username and is_correct_password:
-        bot.send_message(message.chat.id, "Success registration")
         database_factory.add_consumer_telebot_id(result, message.from_user.id)
+        bot.send_message(message.chat.id, "Success registration")
+        main_menu(message)
     else:
         bot.send_message(message.chat.id, "Username or password is incorrect")
 
@@ -124,6 +111,25 @@ def callback_query(callback):
 
     elif "products" in callback.data:
         show_products(callback)
+
+    elif callback.data == "login":
+        bot.delete_message(callback.message.chat.id, callback.message.message_id)
+        bot.send_message(callback.message.chat.id, 'Enter your username from Flavour Flow site')
+        bot.register_next_step_handler(callback.message, after_username)
+
+
+def main_menu(message):
+    markup = types.InlineKeyboardMarkup()
+    btn1 = types.InlineKeyboardButton('Go to our site', url='http://flavourflow.eu-central-1.elasticbeanstalk.com')
+    markup.add(btn1)
+    if message.from_user.id in database_factory.get_authorization_users():
+        btn2 = types.InlineKeyboardButton('Go to catalog', callback_data='1-companies')
+        markup.add(btn2)
+    else:
+        btn2 = types.InlineKeyboardButton('Registration', callback_data='register')
+        btn3 = types.InlineKeyboardButton('Login', callback_data='login')
+        markup.row(btn2, btn3)
+    bot.send_message(message.chat.id, "Main menu:", reply_markup=markup)
 
 
 def after_question(message, user_id):
