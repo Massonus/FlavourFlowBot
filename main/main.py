@@ -67,6 +67,7 @@ def after_password(message, username):
 
     if is_correct_username and is_correct_password:
         bot.send_message(message.chat.id, "Success registration")
+        database_factory.add_consumer_telebot_id(result, message.from_user.id)
     else:
         bot.send_message(message.chat.id, "Username or password is incorrect")
 

@@ -65,6 +65,12 @@ def verify_password(username, password):
         return "incorrect", False
 
 
+def add_consumer_telebot_id(username, user_id):
+    data = pd.read_sql('consumer', engine)
+    data.loc[data['username'] == username, 'telegram_id'] = user_id
+    data.to_sql('consumer', engine, if_exists='replace', index=False, index_label='id')
+
+
 def add_pending_user(user_id):
     df1 = pd.DataFrame([{'user_id': user_id}])
     df1.to_sql('pending_users', engine, if_exists='append', index=False, index_label='id')
