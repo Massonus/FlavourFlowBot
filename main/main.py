@@ -82,6 +82,8 @@ def callback_query(callback):
 
     elif callback.data == "register":
         bot.delete_message(callback.message.chat.id, callback.message.message_id)
+        bot.send_message(callback.message.chat.id, 'Enter your username')
+        bot.register_next_step_handler(callback.message, after_registration_username)
 
 
 def main_menu(message):
@@ -122,13 +124,51 @@ def after_login_username(message):
     bot.register_next_step_handler(message, after_login_password, username)
 
 
+def after_registration_username(message):
+    username = message.text
+    if username in database_factory.get_consumers_usernames():
+        bot.send_message(message.chat.id, "This username is already in use")
+        main_menu(message)
+    else:
+        bot.send_message(message.chat.id, "Enter email")
+        bot.register_next_step_handler(message, after_registration_email, username)
+
+
+def after_registration_email(message, username):
+    email = message.text
+    if email in database_factory.get_consumers_emails():
+        bot.send_message(message.chat.id, "This email is already in use")
+        main_menu(message)
+    else:
+        bot.send_message(message.chat.id, "Enter password")
+        bot.register_next_step_handler(message, after_registration_password, username, email)
+
+
+def after_registration_password(message, username, email):
+    password = message.text
+    bot.send_message(message.chat.id, "Confirm password")
+    bot.register_next_step_handler(message, registration_result, username, email, password)
+
+
+def registration_result(message, username, email, password):
+    confirm_password = message.text
+    if password == confirm_password and username not in database_factory.get_consumers_usernames():
+        bot.send_message(message.chat.id, "Successful registration")
+        database_factory.add_new_consumer(username, email, password, message.from_user.id)
+        main_menu(message)
+
+    elif not password == confirm_password:
+        bot.send_message(message.chat.id, "Passwords are different, try again")
+        main_menu(message)
+
+
 def after_login_password(message, username):
     result, is_correct_username = database_factory.get_user_by_username(username)
     is_correct_password = database_factory.verify_password(result, message.text)
 
     if is_correct_username and is_correct_password:
         database_factory.add_consumer_telebot_id(result, message.from_user.id)
-        bot.send_message(message.chat.id, "Success registration")
+        bot.send_message(message.chat.id, "Success authorization")
         main_menu(message)
     else:
         bot.send_message(message.chat.id, "Username or password is incorrect")

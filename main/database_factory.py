@@ -44,8 +44,18 @@ def get_pending_users():
     except exc.ProgrammingError:
         data = pd.DataFrame(columns=['user_id'])
         data.to_sql('pending_users', engine, if_exists='append', index=False, index_label='id')
-    user_id = data['user_id'].values.tolist()
-    return user_id
+    pending_users = data['user_id'].values.tolist()
+    return pending_users
+
+
+def get_consumers_usernames():
+    data = pd.read_sql('consumer', engine)
+    return data['username'].values.tolist()
+
+
+def get_consumers_emails():
+    data = pd.read_sql('consumer', engine)
+    return data['email'].values.tolist()
 
 
 def get_user_by_username(username):
@@ -74,6 +84,15 @@ def add_consumer_telebot_id(username, user_id):
 def add_pending_user(user_id):
     df1 = pd.DataFrame([{'user_id': user_id}])
     df1.to_sql('pending_users', engine, if_exists='append', index=False, index_label='id')
+
+
+def add_new_consumer(username, email, password, telegram_id):
+    data = pd.read_sql('consumer', engine)
+    df1 = pd.DataFrame(
+        [{'id': max(data['id'].values + 1), 'username': username, 'password': bcrypt.hash(password), 'bonuses': 0,
+          'email': email,
+          'redactor': 'telegram registration', 'telegram_id': telegram_id}])
+    df1.to_sql('consumer', engine, if_exists='append', index=False, index_label='id')
 
 
 def delete_pending_user(user_id):
