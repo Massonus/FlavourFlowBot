@@ -203,17 +203,20 @@ def show_products(callback):
     if page == 1:
         markup.add(types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '),
                    types.InlineKeyboardButton(text=f'Forward --->',
-                                              callback_data=f"{page + 1}-{company_id}-{page}-products"))
+                                              callback_data=f"{page + 1}-{company_id}-{company_page}-products"))
 
     elif page == count:
         markup.add(
-            types.InlineKeyboardButton(text=f'<--- Back', callback_data=f"{page - 1}-{company_id}-{page}-products"),
+            types.InlineKeyboardButton(text=f'<--- Back',
+                                       callback_data=f"{page - 1}-{company_id}-{company_page}-products"),
             types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '))
     else:
         markup.add(
-            types.InlineKeyboardButton(text=f'<--- Back', callback_data=f"{page - 1}-{company_id}-{page}-products"),
+            types.InlineKeyboardButton(text=f'<--- Back',
+                                       callback_data=f"{page - 1}-{company_id}-{company_page}-products"),
             types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '),
-            types.InlineKeyboardButton(text=f'Forward --->', callback_data=f"{page + 1}-{company_id}-{page}-products"))
+            types.InlineKeyboardButton(text=f'Forward --->',
+                                       callback_data=f"{page + 1}-{company_id}-{company_page}-products"))
 
     bot.delete_message(callback.message.chat.id, callback.message.message_id)
     bot.send_photo(callback.message.chat.id, photo=data[5], caption=f'<b>{data[6]}</b>\n\n'
