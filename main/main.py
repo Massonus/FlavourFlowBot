@@ -127,12 +127,19 @@ def after_login_username(message):
 
 def after_registration_username(message):
     username = message.text
-    if username in database_factory.get_consumers_usernames():
-        bot.send_message(message.chat.id, "This username is already in use")
-        main_menu(message)
-    else:
+    if username not in database_factory.get_consumers_usernames() and re.search(r'^[a-zA-Z][a-zA-Z0-9_]*$',
+                                                                                username) is not None:
         bot.send_message(message.chat.id, "Enter email")
         bot.register_next_step_handler(message, after_registration_email, username)
+
+    elif username in database_factory.get_consumers_usernames():
+        bot.send_message(message.chat.id, "This username is already in use")
+        main_menu(message)
+
+    elif re.search(r'^[a-zA-Z][a-zA-Z0-9_]*$', username) is None:
+        bot.send_message(message.chat.id,
+                         "Username must start with a letter and contain only letters, numbers, and underscores")
+        main_menu(message)
 
 
 def after_registration_email(message, username):
@@ -153,8 +160,15 @@ def after_registration_email(message, username):
 
 def after_registration_password(message, username, email):
     password = message.text
-    bot.send_message(message.chat.id, "Confirm password")
-    bot.register_next_step_handler(message, registration_result, username, email, password)
+    if re.search(r'[A-Za-z0-9!@#$%^&+=]{6,15}', password) is not None:
+        bot.send_message(message.chat.id, "Confirm password")
+        bot.register_next_step_handler(message, registration_result, username, email, password)
+
+    else:
+        bot.send_message(message.chat.id,
+                         "Password must be 4-15 characters long and contain at least one letter, "
+                         "one digit, and one special character")
+        main_menu(message)
 
 
 def registration_result(message, username, email, password):
@@ -177,6 +191,7 @@ def after_login_password(message, username):
         database_factory.add_consumer_telebot_id(result, message.from_user.id)
         bot.send_message(message.chat.id, "Success authorization")
         main_menu(message)
+
     else:
         bot.send_message(message.chat.id, "Username or password is incorrect")
 
