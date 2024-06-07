@@ -15,7 +15,9 @@ bot = telebot.TeleBot(TG_TOKEN)
 @bot.message_handler(commands=['start'])
 def start(message):
     if message.from_user.id in database_factory.get_authorization_users():
-        bot.send_message(message.chat.id, "Welcome. You are authorized!")
+        bot.send_message(message.chat.id,
+                         f"Welcome. You are authorized as "
+                         f"{database_factory.get_user_by_telegram_id(message.from_user.id)}!")
     else:
         bot.send_message(message.chat.id, "Welcome. You are not authorized! You can do it below")
     main_menu(message)
@@ -160,13 +162,13 @@ def after_registration_email(message, username):
 
 def after_registration_password(message, username, email):
     password = message.text
-    if re.search(r'[A-Za-z0-9!@#$%^&+=]{6,15}', password) is not None:
+    if re.search(r'^(?=.*[a-zA-Z])(?=.*\d)(?=.*[\W_]).{6,15}$', password) is not None:
         bot.send_message(message.chat.id, "Confirm password")
         bot.register_next_step_handler(message, registration_result, username, email, password)
 
     else:
         bot.send_message(message.chat.id,
-                         "Password must be 4-15 characters long and contain at least one letter, "
+                         "Password must be 6-15 characters long and contain at least one letter, "
                          "one digit, and one special character")
         main_menu(message)
 
@@ -174,8 +176,10 @@ def after_registration_password(message, username, email):
 def registration_result(message, username, email, password):
     confirm_password = message.text
     if password == confirm_password and username not in database_factory.get_consumers_usernames():
-        bot.send_message(message.chat.id, "Successful registration")
         database_factory.add_new_consumer(username, email, password, message.from_user.id)
+        bot.send_message(message.chat.id,
+                         f"Successful registration. Welcome "
+                         f"{database_factory.get_user_by_telegram_id(message.from_user.id)}!")
         main_menu(message)
 
     elif not password == confirm_password:
@@ -189,7 +193,8 @@ def after_login_password(message, username):
 
     if is_correct_username and is_correct_password:
         database_factory.add_consumer_telebot_id(result, message.from_user.id)
-        bot.send_message(message.chat.id, "Success authorization")
+        bot.send_message(message.chat.id, f"Success authorization. Welcome "
+                                          f"{database_factory.get_user_by_telegram_id(message.from_user.id)}!")
         main_menu(message)
 
     else:

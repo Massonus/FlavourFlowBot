@@ -66,6 +66,14 @@ def get_user_by_username(username):
         return "incorrect", False
 
 
+def get_user_by_telegram_id(user_id):
+    data = pd.read_sql('consumer', engine)
+    try:
+        return data.loc[data['telegram_id'] == user_id, 'username'].values[0]
+    except IndexError:
+        return "incorrect"
+
+
 def verify_password(username, password):
     data = pd.read_sql('consumer', engine)
     try:
