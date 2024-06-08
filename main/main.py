@@ -447,55 +447,58 @@ def companies_catalog(callback):
 
 
 def products_catalog(callback):
-    text_split = callback.data.split('-')
-    page = int(text_split[0])
-    company_id = int(text_split[1])
-    company_page = int(text_split[2])
+    try:
+        text_split = callback.data.split('-')
+        page = int(text_split[0])
+        company_id = int(text_split[1])
+        company_page = int(text_split[2])
 
-    # Number of rows and data for 1 page
-    data, count = pagination.data_list_for_page(tables='product', order='title', page=page,
-                                                skip_size=1,  # skip_size - display by one element
-                                                wheres=f"WHERE company_id = {company_id}")
+        # Number of rows and data for 1 page
+        data, count = pagination.data_list_for_page(tables='product', order='title', page=page,
+                                                    skip_size=1,  # skip_size - display by one element
+                                                    wheres=f"WHERE company_id = {company_id}")
 
-    markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton(text='Return to main menu', callback_data='main menu'))
-    markup.add(types.InlineKeyboardButton(text='Bask to companies', callback_data=f"{company_page}-companies"))
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton(text='Return to main menu', callback_data='main menu'))
+        markup.add(types.InlineKeyboardButton(text='Bask to companies', callback_data=f"{company_page}-companies"))
 
-    if db.is_admin(callback.from_user.id):
-        add_btn = types.InlineKeyboardButton('Add item', callback_data=f'{company_id}-add product')
-        delete_btn = types.InlineKeyboardButton('Delete item', callback_data=' ')
+        if db.is_admin(callback.from_user.id):
+            add_btn = types.InlineKeyboardButton('Add item', callback_data=f'{company_id}-add product')
+            delete_btn = types.InlineKeyboardButton('Delete item', callback_data=' ')
 
-        markup.add(add_btn)
-        markup.add(delete_btn)
+            markup.add(add_btn)
+            markup.add(delete_btn)
 
-    if db.is_authorized(callback.from_user.id):
-        add_to_basket = types.InlineKeyboardButton('Add to basket', callback_data=' ')
-        add_to_wishlist = types.InlineKeyboardButton('Add to wishlist', callback_data=' ')
-        markup.row(add_to_basket, add_to_wishlist)
+        if db.is_authorized(callback.from_user.id):
+            add_to_basket = types.InlineKeyboardButton('Add to basket', callback_data=' ')
+            add_to_wishlist = types.InlineKeyboardButton('Add to wishlist', callback_data=' ')
+            markup.row(add_to_basket, add_to_wishlist)
 
-    if page == 1:
-        markup.add(types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '),
-                   types.InlineKeyboardButton(text=f'Forward --->',
-                                              callback_data=f"{page + 1}-{company_id}-{company_page}-products"))
+        if page == 1:
+            markup.add(types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '),
+                       types.InlineKeyboardButton(text=f'Forward --->',
+                                                  callback_data=f"{page + 1}-{company_id}-{company_page}-products"))
 
-    elif page == count:
-        markup.add(
-            types.InlineKeyboardButton(text=f'<--- Back',
-                                       callback_data=f"{page - 1}-{company_id}-{company_page}-products"),
-            types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '))
-    else:
-        markup.add(
-            types.InlineKeyboardButton(text=f'<--- Back',
-                                       callback_data=f"{page - 1}-{company_id}-{company_page}-products"),
-            types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '),
-            types.InlineKeyboardButton(text=f'Forward --->',
-                                       callback_data=f"{page + 1}-{company_id}-{company_page}-products"))
+        elif page == count:
+            markup.add(
+                types.InlineKeyboardButton(text=f'<--- Back',
+                                           callback_data=f"{page - 1}-{company_id}-{company_page}-products"),
+                types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '))
+        else:
+            markup.add(
+                types.InlineKeyboardButton(text=f'<--- Back',
+                                           callback_data=f"{page - 1}-{company_id}-{company_page}-products"),
+                types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '),
+                types.InlineKeyboardButton(text=f'Forward --->',
+                                           callback_data=f"{page + 1}-{company_id}-{company_page}-products"))
 
-    bot.delete_message(callback.message.chat.id, callback.message.message_id)
-    bot.send_photo(callback.message.chat.id, photo=data[5], caption=f'<b>{data[7]}</b>\n\n'
-                                                                    f'<b>Description:</b> <i>{data[4]}</i>\n'
-                                                                    f'<b>Composition:</b> <i>{data[3]}</i>\n',
-                   parse_mode="HTML", reply_markup=markup)
+        bot.delete_message(callback.message.chat.id, callback.message.message_id)
+        bot.send_photo(callback.message.chat.id, photo=data[5], caption=f'<b>{data[7]}</b>\n\n'
+                                                                        f'<b>Description:</b> <i>{data[4]}</i>\n'
+                                                                        f'<b>Composition:</b> <i>{data[3]}</i>\n',
+                       parse_mode="HTML", reply_markup=markup)
+    except IndexError:
+        bot.send_message(callback.message.chat.id, "The product list of this company is empty")
 
 
 @bot.message_handler()
