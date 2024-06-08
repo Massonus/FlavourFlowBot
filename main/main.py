@@ -109,6 +109,69 @@ def callback_query(callback):
         else:
             bot.send_message(callback.message.chat.id, 'You have already sent a message, please wait an answer')
 
+    elif callback.data == "add product":
+        bot.delete_message(callback.message.chat.id, callback.message.message_id)
+        markup = types.InlineKeyboardMarkup()
+        meal_btn = types.InlineKeyboardButton('MEAL', callback_data='meal')
+        drink_btn = types.InlineKeyboardButton('DRINK', callback_data='drink')
+        markup.row(meal_btn, drink_btn)
+        bot.send_message(callback.message.chat.id, 'Choose product category', reply_markup=markup)
+
+    elif callback.data == "meal":
+        bot.delete_message(callback.message.chat.id, callback.message.message_id)
+        image_question(callback, "MEAL")
+
+    elif callback.data == "drink":
+        bot.delete_message(callback.message.chat.id, callback.message.message_id)
+        image_question(callback, "DRINK")
+
+    elif "dropbox" in callback.data:
+        product_category = callback.data.split('-')[0]
+        values = {'product_category': product_category, 'image_way': 'DROPBOX'}
+        after_image_question(callback, values)
+
+    elif "link" in callback.data:
+        product_category = callback.data.split('-')[0]
+        values = {'product_category': product_category, 'image_way': 'LINK'}
+        after_image_question(callback, values)
+
+
+def image_question(callback, product_category):
+    markup = types.InlineKeyboardMarkup()
+    dbx_btn = types.InlineKeyboardButton('DROPBOX', callback_data=f'{product_category}-dropbox')
+    link_btn = types.InlineKeyboardButton('LINK', callback_data=f'{product_category}-link')
+    markup.row(dbx_btn, link_btn)
+    bot.send_message(callback.message.chat.id, 'You will upload image from your PC or use link', reply_markup=markup)
+
+
+def after_image_question(callback, values):
+    bot.delete_message(callback.message.chat.id, callback.message.message_id)
+    bot.send_message(callback.message.chat.id, 'Enter product title:')
+    bot.register_next_step_handler(callback.message, after_product_title, values)
+
+
+def after_product_title(message, values):
+    values.update({'title': message.text})
+    bot.send_message(message.chat.id, 'Enter product description:')
+    bot.register_next_step_handler(message, after_product_description, values)
+
+
+def after_product_description(message, values):
+    values.update({'description': message.text})
+    bot.send_message(message.chat.id, 'Enter product composition:')
+    bot.register_next_step_handler(message, after_product_composition, values)
+
+
+def after_product_composition(message, values):
+    values.update({'composition': message.text})
+    bot.send_message(message.chat.id, 'Enter product price (use only numbers):')
+    bot.register_next_step_handler(message, after_product_price, values)
+
+
+def after_product_price(message, values):
+    values.update({'price': float(message.text)})
+    print(values)
+
 
 def main_menu(message):
     markup = types.InlineKeyboardMarkup()
@@ -320,7 +383,7 @@ def products_catalog(callback):
     markup.add(types.InlineKeyboardButton(text='Bask to companies', callback_data=f"{company_page}-companies"))
 
     if db.is_admin(callback.from_user.id):
-        add_btn = types.InlineKeyboardButton('Add item', callback_data=' ')
+        add_btn = types.InlineKeyboardButton('Add item', callback_data='add product')
         delete_btn = types.InlineKeyboardButton('Delete item', callback_data=' ')
 
         markup.add(add_btn)
