@@ -53,6 +53,16 @@ def get_authorization_users():
     return users
 
 
+def get_categories():
+    df = pd.read_sql('kitchen_categories', engine)
+    return pd.Series(df.title.values, index=df.id).to_dict()
+
+
+def get_countries():
+    df = pd.read_sql('company_country', engine)
+    return pd.Series(df.title.values, index=df.id).to_dict()
+
+
 def get_pending_users():
     try:
         data = pd.read_sql('pending_users', engine)
@@ -118,12 +128,15 @@ def add_new_consumer(username, email, password, telegram_id):
     df1.to_sql('consumer', engine, if_exists='append', index=False, index_label='id')
 
 
-def add_new_product(values):
-    data = pd.read_sql('product', engine)
-    product_id = max(data['id'].values + 1)
-    values.update({'id': product_id})
+def add_new_item(values):
+    item_type = values.get('type').lower()
+    data = pd.read_sql(item_type, engine)
+    item_id = max(data['id'].values + 1)
+    values.update({'id': item_id})
+    values.pop('type')
+    values.pop('image_way')
     df1 = pd.DataFrame([values])
-    df1.to_sql('product', engine, if_exists='append', index=False, index_label='id')
+    df1.to_sql(item_type, engine, if_exists='append', index=False, index_label='id')
 
 
 def delete_pending_user(user_id):
