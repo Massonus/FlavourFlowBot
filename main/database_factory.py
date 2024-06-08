@@ -53,6 +53,16 @@ def get_authorization_users():
     return users
 
 
+def get_categories():
+    df = pd.read_sql('kitchen_categories', engine)
+    return pd.Series(df.title.values, index=df.id).to_dict()
+
+
+def get_countries():
+    df = pd.read_sql('company_country', engine)
+    return pd.Series(df.title.values, index=df.id).to_dict()
+
+
 def get_pending_users():
     try:
         data = pd.read_sql('pending_users', engine)

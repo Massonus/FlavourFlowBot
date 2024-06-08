@@ -131,8 +131,7 @@ def callback_query(callback):
                       'company_id': company_id}
             after_product_image_question(callback, values)
         except ValueError:
-            values = {'type': 'COMPANY', 'image_way': 'DROPBOX'}
-            after_company_image_question(callback, values)
+            after_company_image_question(callback)
 
     elif "link" in callback.data:
         try:
@@ -142,8 +141,16 @@ def callback_query(callback):
                       'company_id': company_id}
             after_product_image_question(callback, values)
         except ValueError:
-            values = {'type': 'COMPANY', 'image_way': 'LINK'}
-            after_company_image_question(callback, values)
+            after_company_image_question(callback)
+
+    elif "category" in callback.data:
+        category_id = int(callback.data.split('-')[0])
+        after_company_category(callback, category_id)
+
+    elif "country" in callback.data:
+        category_id = int(callback.data.split('-')[0])
+        country_id = int(callback.data.split('-')[1])
+        after_company_country(callback.message, category_id, country_id)
 
 
 def image_question(callback, product_category=None, company_id=None):
@@ -160,9 +167,28 @@ def after_product_image_question(callback, values):
     bot.register_next_step_handler(callback.message, after_product_title, values)
 
 
-def after_company_image_question(callback, values):
+def after_company_image_question(callback):
     bot.delete_message(callback.message.chat.id, callback.message.message_id)
-    print("Here we go again")
+    categories = db.get_categories()
+    markup = types.InlineKeyboardMarkup()
+    for category_id, title in categories.items():
+        category_btn = types.InlineKeyboardButton(title, callback_data=f'{category_id}-category')
+        markup.add(category_btn)
+    bot.send_message(callback.message.chat.id, 'Choose company category:', reply_markup=markup)
+
+
+def after_company_category(callback, category_id):
+    bot.delete_message(callback.message.chat.id, callback.message.message_id)
+    countries = db.get_countries()
+    markup = types.InlineKeyboardMarkup()
+    for country_id, title in countries.items():
+        category_btn = types.InlineKeyboardButton(title, callback_data=f'{category_id}-{country_id}-country')
+        markup.add(category_btn)
+    bot.send_message(callback.message.chat.id, 'Choose company category:', reply_markup=markup)
+
+
+def after_company_country(message, country_id, category_id):
+    values = {'type': 'COMPANY', 'image_way': 'DROPBOX', 'country_id': country_id, 'category_id': category_id}
     print(values)
 
 
