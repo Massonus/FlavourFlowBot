@@ -23,17 +23,6 @@ def start(message):
     main_menu(message)
 
 
-@bot.message_handler(commands=['help'])
-def command_help(message):
-    # bot.send_message(message.chat.id, message.chat.id)
-    # bot.send_message(message.from_user.id, message.chat.id)
-    if str(message.from_user.id) in db.get_pending_users():
-        bot.send_message(message.chat.id, 'You have already sent a message, please wait an answer')
-    else:
-        bot.send_message(message.chat.id, 'Enter your question')
-        bot.register_next_step_handler(message, after_question, message.from_user.id)
-
-
 @bot.message_handler(commands=['logout'])
 def command_help(message):
     try:
@@ -81,14 +70,16 @@ def callback_query(callback):
     elif "ignore" in callback.data:
         ignore_message(callback)
 
-    elif callback.data == "unseen":
-        bot.delete_message(callback.message.chat.id, callback.message.message_id)
-
     elif "companies" in callback.data:
         companies_catalog(callback)
 
     elif "products" in callback.data:
         products_catalog(callback)
+
+    elif callback.data == "main menu":
+        bot.delete_message(callback.message.chat.id, callback.message.message_id)
+        callback.message.from_user.id = callback.from_user.id
+        main_menu(callback.message)
 
     elif callback.data == "login":
         bot.delete_message(callback.message.chat.id, callback.message.message_id)
@@ -100,29 +91,51 @@ def callback_query(callback):
         bot.send_message(callback.message.chat.id, 'Enter your username')
         bot.register_next_step_handler(callback.message, after_registration_username)
 
+    elif callback.data == "help":
+        # bot.send_message(message.chat.id, message.chat.id)
+        # bot.send_message(message.from_user.id, message.chat.id)
+        if str(callback.from_user.id) not in db.get_pending_users():
+            bot.send_message(callback.message.chat.id, 'Enter your question')
+            bot.register_next_step_handler(callback.message, after_question, callback.from_user.id)
+        else:
+            bot.send_message(callback.message.chat.id, 'You have already sent a message, please wait an answer')
+
 
 def main_menu(message):
     markup = types.InlineKeyboardMarkup()
-    btn1 = types.InlineKeyboardButton('Go to our site', url='http://flavourflow.eu-central-1.elasticbeanstalk.com')
-    markup.add(btn1)
+
     if message.from_user.id in db.get_authorization_users():
-        btn2 = types.InlineKeyboardButton('Go to catalog', callback_data='1-companies')
-        markup.add(btn2)
-    else:
-        btn2 = types.InlineKeyboardButton('Login', callback_data='login')
-        btn3 = types.InlineKeyboardButton('Registration', callback_data='register')
-        markup.row(btn2, btn3)
-    bot.send_message(message.chat.id, "Main menu:", reply_markup=markup)
+        profile_btn = types.InlineKeyboardButton('🎗️ Profile', callback_data=' ')
+        orders_btn = types.InlineKeyboardButton('🧾 Orders', callback_data=' ')
+        markup.add(profile_btn)
+        markup.add(orders_btn)
+
+    elif message.from_user.id not in db.get_authorization_users():
+        login_btn = types.InlineKeyboardButton('👤 Login', callback_data='login')
+        register_btn = types.InlineKeyboardButton('🆕 Registration', callback_data='register')
+        markup.row(login_btn, register_btn)
+
+    catalog_btn = types.InlineKeyboardButton('🏪 Go to catalog', callback_data='1-companies')
+    support_btn = types.InlineKeyboardButton('💬 Write to us', callback_data='help')
+    site_btn = types.InlineKeyboardButton('🔗 Go to our site',
+                                          url='http://flavourflow.eu-central-1.elasticbeanstalk.com')
+
+    markup.add(catalog_btn)
+    markup.add(support_btn)
+    markup.add(site_btn)
+
+    bot.send_message(message.chat.id, "Main menu. Choose the option:", reply_markup=markup)
 
 
 def after_question(message, user_id):
     bot.reply_to(message, "Your question was sent")
+    main_menu(message)
     db.add_pending_user(user_id)
     markup = types.InlineKeyboardMarkup()
     btn1 = types.InlineKeyboardButton('💬 Answer',
                                       callback_data=f'{message.chat.id}-{message.from_user.id}-{message.message_id}'
                                                     f'-answer')
-    btn2 = types.InlineKeyboardButton('❎ Ignore',
+    btn2 = types.InlineKeyboardButton('❌ Ignore',
                                       callback_data=f'{message.chat.id}-{message.from_user.id}-{message.message_id}'
                                                     f'-ignore')
     markup.row(btn1, btn2)
@@ -248,10 +261,10 @@ def companies_catalog(callback):
 
     # Number of rows and data for 1 page
     data, count = pagination.data_list_for_page(tables='company', order='title', page=page,
-                                                skip_size=1)  # SkipSize - display by one element
+                                                skip_size=1)  # skip_size - display by one element
 
     markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton(text='Hide', callback_data='unseen'))
+    markup.add(types.InlineKeyboardButton(text='Return to main menu', callback_data='main menu'))
 
     markup.add(
         types.InlineKeyboardButton(text='Products of this company', callback_data=f"1-{data[3]}-{page}-products"))
@@ -282,11 +295,11 @@ def products_catalog(callback):
 
     # Number of rows and data for 1 page
     data, count = pagination.data_list_for_page(tables='product', order='title', page=page,
-                                                skip_size=1,  # SkipSize - display by one element
+                                                skip_size=1,  # skip_size - display by one element
                                                 wheres=f"WHERE company_id = {company_id}")
 
     markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton(text='Hide', callback_data='unseen'))
+    markup.add(types.InlineKeyboardButton(text='Return to main menu', callback_data='main menu'))
     markup.add(types.InlineKeyboardButton(text='Bask to companies', callback_data=f"{company_page}-companies"))
 
     add_to_basket = types.InlineKeyboardButton('Add to basket', callback_data=' ')
@@ -312,8 +325,9 @@ def products_catalog(callback):
                                        callback_data=f"{page + 1}-{company_id}-{company_page}-products"))
 
     bot.delete_message(callback.message.chat.id, callback.message.message_id)
-    bot.send_photo(callback.message.chat.id, photo=data[5], caption=f'<b>{data[6]}</b>\n\n'
-                                                                    f'<b>Description:</b> <i>{data[4]}</i>\n',
+    bot.send_photo(callback.message.chat.id, photo=data[5], caption=f'<b>{data[7]}</b>\n\n'
+                                                                    f'<b>Description:</b> <i>{data[4]}</i>\n'
+                                                                    f'<b>Composition:</b> <i>{data[3]}</i>\n',
                    parse_mode="HTML", reply_markup=markup)
 
 

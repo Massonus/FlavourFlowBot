@@ -29,13 +29,13 @@ class PaginationData():
 
 def get_authorization_users():
     data = pd.read_sql('consumer', engine)
-    user_id = []
+    users = []
     try:
-        user_id = data['telegram_id'].values.tolist()
+        users = data['telegram_id'].values.tolist()
     except KeyError:
         data['telegram_id'] = [0] * len(data)
         data.to_sql('consumer', engine, if_exists='replace', index=False, index_label='id')
-    return user_id
+    return users
 
 
 def get_pending_users():
