@@ -109,6 +109,10 @@ def callback_query(callback):
         markup.row(meal_btn, drink_btn)
         bot.send_message(callback.message.chat.id, 'Choose product category', reply_markup=markup)
 
+    elif "add company" in callback.data:
+        bot.delete_message(callback.message.chat.id, callback.message.message_id)
+        image_question(callback)
+
     elif "meal" in callback.data:
         company_id = int(callback.data.split('-')[0])
         bot.delete_message(callback.message.chat.id, callback.message.message_id)
@@ -120,21 +124,29 @@ def callback_query(callback):
         image_question(callback, "DRINK", company_id)
 
     elif "dropbox" in callback.data:
-        product_category = callback.data.split('-')[0]
-        company_id = int(callback.data.split('-')[1])
-        values = {'type': 'PRODUCT', 'product_category': product_category, 'image_way': 'DROPBOX',
-                  'company_id': company_id}
-        after_image_question(callback, values)
+        try:
+            product_category = callback.data.split('-')[0]
+            company_id = int(callback.data.split('-')[1])
+            values = {'type': 'PRODUCT', 'product_category': product_category, 'image_way': 'DROPBOX',
+                      'company_id': company_id}
+            after_product_image_question(callback, values)
+        except ValueError:
+            values = {'type': 'COMPANY', 'image_way': 'DROPBOX'}
+            after_company_image_question(callback, values)
 
     elif "link" in callback.data:
-        company_id = int(callback.data.split('-')[1])
-        product_category = callback.data.split('-')[0]
-        values = {'type': 'PRODUCT', 'product_category': product_category, 'image_way': 'LINK',
-                  'company_id': company_id}
-        after_image_question(callback, values)
+        try:
+            company_id = int(callback.data.split('-')[1])
+            product_category = callback.data.split('-')[0]
+            values = {'type': 'PRODUCT', 'product_category': product_category, 'image_way': 'LINK',
+                      'company_id': company_id}
+            after_product_image_question(callback, values)
+        except ValueError:
+            values = {'type': 'COMPANY', 'image_way': 'LINK'}
+            after_company_image_question(callback, values)
 
 
-def image_question(callback, product_category, company_id):
+def image_question(callback, product_category=None, company_id=None):
     markup = types.InlineKeyboardMarkup()
     dbx_btn = types.InlineKeyboardButton('DROPBOX', callback_data=f'{product_category}-{company_id}-dropbox')
     link_btn = types.InlineKeyboardButton('LINK', callback_data=f'{product_category}-{company_id}-link')
@@ -142,10 +154,16 @@ def image_question(callback, product_category, company_id):
     bot.send_message(callback.message.chat.id, 'You will upload image from your PC or use link', reply_markup=markup)
 
 
-def after_image_question(callback, values):
+def after_product_image_question(callback, values):
     bot.delete_message(callback.message.chat.id, callback.message.message_id)
     bot.send_message(callback.message.chat.id, 'Enter product title:')
     bot.register_next_step_handler(callback.message, after_product_title, values)
+
+
+def after_company_image_question(callback, values):
+    bot.delete_message(callback.message.chat.id, callback.message.message_id)
+    print("Here we go again")
+    print(values)
 
 
 def after_product_title(message, values):
@@ -366,7 +384,7 @@ def companies_catalog(callback):
         types.InlineKeyboardButton(text='Products of this company', callback_data=f"1-{data[3]}-{page}-products"))
 
     if db.is_admin(callback.from_user.id):
-        add_btn = types.InlineKeyboardButton('Add item', callback_data=' ')
+        add_btn = types.InlineKeyboardButton('Add item', callback_data='add company')
         delete_btn = types.InlineKeyboardButton('Delete item', callback_data=' ')
 
         markup.add(add_btn)
