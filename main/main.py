@@ -93,45 +93,51 @@ def callback_query(callback):
         bot.register_next_step_handler(callback.message, after_registration_username)
 
     elif callback.data == "help":
-        # bot.send_message(message.chat.id, message.chat.id)
-        # bot.send_message(message.from_user.id, message.chat.id)
+
         if str(callback.from_user.id) not in db.get_pending_users():
             bot.send_message(callback.message.chat.id, 'Enter your question')
             bot.register_next_step_handler(callback.message, after_question, callback.from_user.id)
         else:
             bot.send_message(callback.message.chat.id, 'You have already sent a message, please wait an answer')
 
-    elif callback.data == "add product":
+    elif "add product" in callback.data:
+        company_id = int(callback.data.split('-')[0])
         bot.delete_message(callback.message.chat.id, callback.message.message_id)
         markup = types.InlineKeyboardMarkup()
-        meal_btn = types.InlineKeyboardButton('MEAL', callback_data='meal')
-        drink_btn = types.InlineKeyboardButton('DRINK', callback_data='drink')
+        meal_btn = types.InlineKeyboardButton('MEAL', callback_data=f'{company_id}-meal')
+        drink_btn = types.InlineKeyboardButton('DRINK', callback_data=f'{company_id}-drink')
         markup.row(meal_btn, drink_btn)
         bot.send_message(callback.message.chat.id, 'Choose product category', reply_markup=markup)
 
-    elif callback.data == "meal":
+    elif "meal" in callback.data:
+        company_id = int(callback.data.split('-')[0])
         bot.delete_message(callback.message.chat.id, callback.message.message_id)
-        image_question(callback, "MEAL")
+        image_question(callback, "MEAL", company_id)
 
-    elif callback.data == "drink":
+    elif "drink" in callback.data:
+        company_id = int(callback.data.split('-')[0])
         bot.delete_message(callback.message.chat.id, callback.message.message_id)
-        image_question(callback, "DRINK")
+        image_question(callback, "DRINK", company_id)
 
     elif "dropbox" in callback.data:
         product_category = callback.data.split('-')[0]
-        values = {'type': 'PRODUCT', 'product_category': product_category, 'image_way': 'DROPBOX'}
+        company_id = int(callback.data.split('-')[1])
+        values = {'type': 'PRODUCT', 'product_category': product_category, 'image_way': 'DROPBOX',
+                  'company_id': company_id}
         after_image_question(callback, values)
 
     elif "link" in callback.data:
+        company_id = int(callback.data.split('-')[1])
         product_category = callback.data.split('-')[0]
-        values = {'type': 'PRODUCT', 'product_category': product_category, 'image_way': 'LINK'}
+        values = {'type': 'PRODUCT', 'product_category': product_category, 'image_way': 'LINK',
+                  'company_id': company_id}
         after_image_question(callback, values)
 
 
-def image_question(callback, product_category):
+def image_question(callback, product_category, company_id):
     markup = types.InlineKeyboardMarkup()
-    dbx_btn = types.InlineKeyboardButton('DROPBOX', callback_data=f'{product_category}-dropbox')
-    link_btn = types.InlineKeyboardButton('LINK', callback_data=f'{product_category}-link')
+    dbx_btn = types.InlineKeyboardButton('DROPBOX', callback_data=f'{product_category}-{company_id}-dropbox')
+    link_btn = types.InlineKeyboardButton('LINK', callback_data=f'{product_category}-{company_id}-link')
     markup.row(dbx_btn, link_btn)
     bot.send_message(callback.message.chat.id, 'You will upload image from your PC or use link', reply_markup=markup)
 
@@ -167,6 +173,7 @@ def after_product_price(message, values):
         bot.register_next_step_handler(message, after_send_image, values)
     elif values.get('image_way') == 'LINK':
         bot.send_message(message.chat.id, 'Enter your link')
+        bot.register_next_step_handler(message, after_send_link, values)
 
 
 def after_send_image(message, values):
@@ -176,8 +183,13 @@ def after_send_image(message, values):
     dropbox.upload_file(message, photo_bytes, bot, values)
 
 
+def after_send_link(message, values):
+    values.update({'image_link': message.text})
+    db.add_new_product(values)
+
+
 def after_upload_image(values):
-    print(values)
+    db.add_new_product(values)
 
 
 def main_menu(message):
@@ -390,7 +402,7 @@ def products_catalog(callback):
     markup.add(types.InlineKeyboardButton(text='Bask to companies', callback_data=f"{company_page}-companies"))
 
     if db.is_admin(callback.from_user.id):
-        add_btn = types.InlineKeyboardButton('Add item', callback_data='add product')
+        add_btn = types.InlineKeyboardButton('Add item', callback_data=f'{company_id}-add product')
         delete_btn = types.InlineKeyboardButton('Delete item', callback_data=' ')
 
         markup.add(add_btn)

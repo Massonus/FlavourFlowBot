@@ -118,6 +118,14 @@ def add_new_consumer(username, email, password, telegram_id):
     df1.to_sql('consumer', engine, if_exists='append', index=False, index_label='id')
 
 
+def add_new_product(values):
+    data = pd.read_sql('product', engine)
+    product_id = max(data['id'].values + 1)
+    values.update({'id': product_id})
+    df1 = pd.DataFrame([values])
+    df1.to_sql('product', engine, if_exists='append', index=False, index_label='id')
+
+
 def delete_pending_user(user_id):
     data = pd.read_sql('pending_users', engine)
     index = data[data['user_id'] == user_id].index
