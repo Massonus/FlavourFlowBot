@@ -173,8 +173,11 @@ def after_send_image(message, values):
     photo_id = bot.get_file(message.photo[len(message.photo) - 1].file_id).file_id
     photo_file = bot.get_file(photo_id)
     photo_bytes = bot.download_file(photo_file.file_path)
-    url = dropbox.upload_file(photo_bytes, message, bot, values)
-    values.update({'image_link': url})
+    dropbox.upload_file(message, photo_bytes, bot, values)
+
+
+def after_upload_image(values):
+    print(values)
 
 
 def main_menu(message):
