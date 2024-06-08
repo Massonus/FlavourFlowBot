@@ -14,17 +14,26 @@ bot = telebot.TeleBot(TG_TOKEN)
 
 @bot.message_handler(commands=['start'])
 def start(message):
+    if not message.chat.type == 'private':
+        bot.send_message(message.chat.id, "I don't work in groups")
+        return False
+
     if db.is_authorized(message.from_user.id):
         bot.send_message(message.chat.id,
                          f"Welcome. You are authorized as "
                          f"{db.get_username_by_telegram_id(message.from_user.id)}!")
     else:
         bot.send_message(message.chat.id, "Welcome. You are not authorized! You can do it below")
+
     main_menu(message)
 
 
 @bot.message_handler(commands=['logout'])
 def command_help(message):
+    if not message.chat.type == 'private':
+        bot.send_message(message.chat.id, "I don't work in groups")
+        return False
+
     try:
         username = db.get_username_by_telegram_id(message.from_user.id)
         db.change_consumer_telebot_id(username, 0)
@@ -141,7 +150,8 @@ def after_question(message, user_id):
     markup.row(btn1, btn2)
     bot.send_message(GROUP_ID,
                      f"<b>New question was taken!</b>"
-                     f"\n<b>From:</b> @{message.from_user.username} ({message.from_user.first_name})"
+                     f"\n<b>From:</b> {message.from_user.first_name} (FFlow username: "
+                     f"{db.get_username_by_telegram_id(message.from_user.id)})"
                      f"\nID: {message.chat.id}"
                      f"\n<b>Message:</b> \"{message.text}\"", reply_markup=markup, parse_mode='HTML')
 
@@ -213,11 +223,11 @@ def registration_result(message, username, email, password):
 
 
 def after_login_password(message, username):
-    result, is_correct_username = db.get_user_by_username(username)
-    is_correct_password = db.verify_password(result, message.text)
+    is_correct_username = db.is_user_exist(username)
+    is_correct_password = db.verify_password(username, message.text)
 
     if is_correct_username and is_correct_password:
-        db.change_consumer_telebot_id(result, message.from_user.id)
+        db.change_consumer_telebot_id(username, message.from_user.id)
         bot.send_message(message.chat.id, f"Success authorization. Welcome "
                                           f"{db.get_username_by_telegram_id(message.from_user.id)}!")
         main_menu(message)

@@ -73,17 +73,20 @@ def get_consumers_emails():
     return data['email'].values.tolist()
 
 
-def get_user_by_username(username):
+def is_user_exist(username):
     data = pd.read_sql('consumer', engine)
     try:
-        return data.loc[data['username'] == username, 'username'].values[0], True
+        return username == data.loc[data['username'] == username, 'username'].values[0]
     except IndexError:
-        return "incorrect", False
+        return False
 
 
 def get_username_by_telegram_id(user_id):
     data = pd.read_sql('consumer', engine)
-    return data.loc[data['telegram_id'] == user_id, 'username'].values[0]
+    try:
+        return data.loc[data['telegram_id'] == user_id, 'username'].values[0]
+    except IndexError:
+        return "Unauthorized"
 
 
 def verify_password(username, password):
