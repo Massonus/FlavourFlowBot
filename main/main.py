@@ -185,11 +185,15 @@ def after_send_image(message, values):
 
 def after_send_link(message, values):
     values.update({'image_link': message.text})
-    db.add_new_product(values)
+    db.add_new_item(values)
+    bot.send_message(message.chat.id, 'Item added')
+    main_menu(message)
 
 
-def after_upload_image(values):
-    db.add_new_product(values)
+def after_upload_image(message, values):
+    db.add_new_item(values)
+    bot.send_message(message.chat.id, 'Item added')
+    main_menu(message)
 
 
 def main_menu(message):
