@@ -8,7 +8,7 @@ from passlib.hash import bcrypt
 engine = sqlalchemy.create_engine(f"postgresql+psycopg2://{postgres_username}:{postgres_password}@localhost:5432/Test")
 
 
-class Database():
+class PaginationData():
     def __init__(self):
         self.conn = psycopg2.connect(database='Test', user='postgres',
                                      password='root', host='localhost', port=5432)
@@ -27,15 +27,30 @@ class Database():
         return res[0], count
 
 
+def is_authorized(telegram_id):
+    return telegram_id in get_authorization_users()
+
+
+def is_admin(telegram_id):
+    data_consumer = pd.read_sql('consumer', engine)
+    data_user_role = pd.read_sql('user_role', engine)
+    try:
+        user_id = data_consumer.loc[data_consumer['telegram_id'] == telegram_id, 'id'].values[0]
+        admins_id = data_user_role.loc[data_user_role['roles'] == "ADMIN", 'user_id'].values.tolist()
+    except IndexError:
+        return False
+    return user_id in admins_id
+
+
 def get_authorization_users():
     data = pd.read_sql('consumer', engine)
-    user_id = []
+    users = []
     try:
-        user_id = data['telegram_id'].values.tolist()
+        users = data['telegram_id'].values.tolist()
     except KeyError:
         data['telegram_id'] = [0] * len(data)
         data.to_sql('consumer', engine, if_exists='replace', index=False, index_label='id')
-    return user_id
+    return users
 
 
 def get_pending_users():
@@ -58,20 +73,20 @@ def get_consumers_emails():
     return data['email'].values.tolist()
 
 
-def get_user_by_username(username):
+def is_user_exist(username):
     data = pd.read_sql('consumer', engine)
     try:
-        return data.loc[data['username'] == username, 'username'].values[0], True
+        return username == data.loc[data['username'] == username, 'username'].values[0]
     except IndexError:
-        return "incorrect", False
+        return False
 
 
-def get_user_by_telegram_id(user_id):
+def get_username_by_telegram_id(user_id):
     data = pd.read_sql('consumer', engine)
     try:
         return data.loc[data['telegram_id'] == user_id, 'username'].values[0]
     except IndexError:
-        return "incorrect"
+        return "Unauthorized"
 
 
 def verify_password(username, password):
@@ -83,7 +98,7 @@ def verify_password(username, password):
         return "incorrect", False
 
 
-def add_consumer_telebot_id(username, user_id):
+def change_consumer_telebot_id(username, user_id):
     data = pd.read_sql('consumer', engine)
     data.loc[data['username'] == username, 'telegram_id'] = user_id
     data.to_sql('consumer', engine, if_exists='replace', index=False, index_label='id')
@@ -101,6 +116,14 @@ def add_new_consumer(username, email, password, telegram_id):
           'email': email,
           'redactor': 'telegram registration', 'telegram_id': telegram_id}])
     df1.to_sql('consumer', engine, if_exists='append', index=False, index_label='id')
+
+
+def add_new_product(values):
+    data = pd.read_sql('product', engine)
+    product_id = max(data['id'].values + 1)
+    values.update({'id': product_id})
+    df1 = pd.DataFrame([values])
+    df1.to_sql('product', engine, if_exists='append', index=False, index_label='id')
 
 
 def delete_pending_user(user_id):
