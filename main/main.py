@@ -1,6 +1,6 @@
 import re
 import telebot
-import dropbox_factory
+import dropbox_factory as dropbox
 import database_factory as db
 from config import GROUP_ID, TG_TOKEN
 from database_factory import PaginationData
@@ -42,14 +42,6 @@ def command_help(message):
     except IndexError:
         bot.send_message(message.from_user.id, "You are not authorized!")
         main_menu(message)
-
-
-@bot.message_handler(content_types=['photo'])
-def handle_docs_photo(message):
-    photo_id = bot.get_file(message.photo[len(message.photo) - 1].file_id).file_id
-    photo_file = bot.get_file(photo_id)
-    photo_bytes = bot.download_file(photo_file.file_path)
-    dropbox_factory.upload_file(photo_bytes)
 
 
 @bot.message_handler(commands=['image'])
@@ -127,12 +119,12 @@ def callback_query(callback):
 
     elif "dropbox" in callback.data:
         product_category = callback.data.split('-')[0]
-        values = {'product_category': product_category, 'image_way': 'DROPBOX'}
+        values = {'type': 'PRODUCT', 'product_category': product_category, 'image_way': 'DROPBOX'}
         after_image_question(callback, values)
 
     elif "link" in callback.data:
         product_category = callback.data.split('-')[0]
-        values = {'product_category': product_category, 'image_way': 'LINK'}
+        values = {'type': 'PRODUCT', 'product_category': product_category, 'image_way': 'LINK'}
         after_image_question(callback, values)
 
 
@@ -170,7 +162,19 @@ def after_product_composition(message, values):
 
 def after_product_price(message, values):
     values.update({'price': float(message.text)})
-    print(values)
+    if values.get('image_way') == 'DROPBOX':
+        bot.send_message(message.chat.id, 'Send here your image')
+        bot.register_next_step_handler(message, after_send_image, values)
+    elif values.get('image_way') == 'LINK':
+        bot.send_message(message.chat.id, 'Enter your link')
+
+
+def after_send_image(message, values):
+    photo_id = bot.get_file(message.photo[len(message.photo) - 1].file_id).file_id
+    photo_file = bot.get_file(photo_id)
+    photo_bytes = bot.download_file(photo_file.file_path)
+    url = dropbox.upload_file(photo_bytes, message, bot, values)
+    values.update({'image_link': url})
 
 
 def main_menu(message):
