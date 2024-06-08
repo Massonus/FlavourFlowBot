@@ -189,7 +189,15 @@ def choose_company_country(message, category_id):
 
 def enter_company_title(message, country_id, category_id):
     values = {'type': 'COMPANY', 'image_way': 'DROPBOX', 'country_id': country_id, 'category_id': category_id}
-    print(values)
+    bot.delete_message(message.chat.id, message.message_id)
+    bot.send_message(message.chat.id, 'Enter company title:')
+    bot.register_next_step_handler(message, enter_company_description, values)
+
+
+def enter_company_description(message, values):
+    values.update({'title': message.text})
+    bot.send_message(message.chat.id, 'Enter company description:')
+    bot.register_next_step_handler(message, send_image_or_link, values)
 
 
 def enter_product_description(message, values):
@@ -211,7 +219,11 @@ def enter_product_price(message, values):
 
 
 def send_image_or_link(message, values):
-    values.update({'price': float(message.text)})
+    try:
+        values.update({'price': float(message.text)})
+    except ValueError:
+        values.update({'description': message.text})
+
     if values.get('image_way') == 'DROPBOX':
         bot.send_message(message.chat.id, 'Send here your image')
         bot.register_next_step_handler(message, upload_image, values)
