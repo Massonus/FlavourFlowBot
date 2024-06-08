@@ -14,10 +14,10 @@ bot = telebot.TeleBot(TG_TOKEN)
 
 @bot.message_handler(commands=['start'])
 def start(message):
-    if message.from_user.id in db.get_authorization_users():
+    if db.is_authorized(message.from_user.id):
         bot.send_message(message.chat.id,
                          f"Welcome. You are authorized as "
-                         f"{db.get_user_by_telegram_id(message.from_user.id)}!")
+                         f"{db.get_username_by_telegram_id(message.from_user.id)}!")
     else:
         bot.send_message(message.chat.id, "Welcome. You are not authorized! You can do it below")
     main_menu(message)
@@ -26,7 +26,7 @@ def start(message):
 @bot.message_handler(commands=['logout'])
 def command_help(message):
     try:
-        username = db.get_user_by_telegram_id(message.from_user.id)
+        username = db.get_username_by_telegram_id(message.from_user.id)
         db.change_consumer_telebot_id(username, 0)
         bot.send_message(message.from_user.id, "Successfully logout")
         main_menu(message)
@@ -104,7 +104,7 @@ def callback_query(callback):
 def main_menu(message):
     markup = types.InlineKeyboardMarkup()
 
-    if message.from_user.id in db.get_authorization_users():
+    if db.is_authorized(message.from_user.id):
         profile_btn = types.InlineKeyboardButton('🎗️ Profile', callback_data=' ')
         orders_btn = types.InlineKeyboardButton('🧾 Orders', callback_data=' ')
         markup.add(profile_btn)
@@ -204,7 +204,7 @@ def registration_result(message, username, email, password):
         db.add_new_consumer(username, email, password, message.from_user.id)
         bot.send_message(message.chat.id,
                          f"Successful registration. Welcome "
-                         f"{db.get_user_by_telegram_id(message.from_user.id)}!")
+                         f"{db.get_username_by_telegram_id(message.from_user.id)}!")
         main_menu(message)
 
     elif not password == confirm_password:
@@ -219,7 +219,7 @@ def after_login_password(message, username):
     if is_correct_username and is_correct_password:
         db.change_consumer_telebot_id(result, message.from_user.id)
         bot.send_message(message.chat.id, f"Success authorization. Welcome "
-                                          f"{db.get_user_by_telegram_id(message.from_user.id)}!")
+                                          f"{db.get_username_by_telegram_id(message.from_user.id)}!")
         main_menu(message)
 
     else:
@@ -269,6 +269,13 @@ def companies_catalog(callback):
     markup.add(
         types.InlineKeyboardButton(text='Products of this company', callback_data=f"1-{data[3]}-{page}-products"))
 
+    if db.is_admin(callback.from_user.id):
+        add_btn = types.InlineKeyboardButton('Add item', callback_data=' ')
+        delete_btn = types.InlineKeyboardButton('Delete item', callback_data=' ')
+
+        markup.add(add_btn)
+        markup.add(delete_btn)
+
     if page == 1:
         markup.add(types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '),
                    types.InlineKeyboardButton(text=f'Forward --->', callback_data=f"{page + 1}-companies"))
@@ -302,9 +309,17 @@ def products_catalog(callback):
     markup.add(types.InlineKeyboardButton(text='Return to main menu', callback_data='main menu'))
     markup.add(types.InlineKeyboardButton(text='Bask to companies', callback_data=f"{company_page}-companies"))
 
-    add_to_basket = types.InlineKeyboardButton('Add to basket', callback_data=' ')
-    add_to_wishlist = types.InlineKeyboardButton('Add to wishlist', callback_data=' ')
-    markup.row(add_to_basket, add_to_wishlist)
+    if db.is_admin(callback.from_user.id):
+        add_btn = types.InlineKeyboardButton('Add item', callback_data=' ')
+        delete_btn = types.InlineKeyboardButton('Delete item', callback_data=' ')
+
+        markup.add(add_btn)
+        markup.add(delete_btn)
+
+    if db.is_authorized(callback.from_user.id):
+        add_to_basket = types.InlineKeyboardButton('Add to basket', callback_data=' ')
+        add_to_wishlist = types.InlineKeyboardButton('Add to wishlist', callback_data=' ')
+        markup.row(add_to_basket, add_to_wishlist)
 
     if page == 1:
         markup.add(types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '),

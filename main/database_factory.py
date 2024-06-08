@@ -27,6 +27,21 @@ class PaginationData():
         return res[0], count
 
 
+def is_authorized(telegram_id):
+    return telegram_id in get_authorization_users()
+
+
+def is_admin(telegram_id):
+    data_consumer = pd.read_sql('consumer', engine)
+    data_user_role = pd.read_sql('user_role', engine)
+    try:
+        user_id = data_consumer.loc[data_consumer['telegram_id'] == telegram_id, 'id'].values[0]
+        admins_id = data_user_role.loc[data_user_role['roles'] == "ADMIN", 'user_id'].values.tolist()
+    except IndexError:
+        return False
+    return user_id in admins_id
+
+
 def get_authorization_users():
     data = pd.read_sql('consumer', engine)
     users = []
@@ -66,7 +81,7 @@ def get_user_by_username(username):
         return "incorrect", False
 
 
-def get_user_by_telegram_id(user_id):
+def get_username_by_telegram_id(user_id):
     data = pd.read_sql('consumer', engine)
     return data.loc[data['telegram_id'] == user_id, 'username'].values[0]
 
