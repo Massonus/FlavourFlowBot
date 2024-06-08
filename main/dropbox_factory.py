@@ -61,6 +61,6 @@ def upload_file(message, photo_bytes, bot, values):
         url = dbx.sharing_create_shared_link_with_settings(path).url.replace("www.dropbox.com",
                                                                              "dl.dropboxusercontent.com")
         values.update({'image_link': url})
-        main.after_upload_image(message, values)
+        main.add_item_with_dropbox_link(message, values)
     except AttributeError:
         print("Waiting...")

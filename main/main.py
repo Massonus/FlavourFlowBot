@@ -85,18 +85,18 @@ def callback_query(callback):
     elif callback.data == "login":
         bot.delete_message(callback.message.chat.id, callback.message.message_id)
         bot.send_message(callback.message.chat.id, 'Enter your username from Flavour Flow site')
-        bot.register_next_step_handler(callback.message, after_login_username)
+        bot.register_next_step_handler(callback.message, enter_login_password)
 
     elif callback.data == "register":
         bot.delete_message(callback.message.chat.id, callback.message.message_id)
         bot.send_message(callback.message.chat.id, 'Enter your username')
-        bot.register_next_step_handler(callback.message, after_registration_username)
+        bot.register_next_step_handler(callback.message, enter_email)
 
     elif callback.data == "help":
 
         if str(callback.from_user.id) not in db.get_pending_users():
             bot.send_message(callback.message.chat.id, 'Enter your question')
-            bot.register_next_step_handler(callback.message, after_question, callback.from_user.id)
+            bot.register_next_step_handler(callback.message, send_question_to_support_group, callback.from_user.id)
         else:
             bot.send_message(callback.message.chat.id, 'You have already sent a message, please wait an answer')
 
@@ -111,17 +111,17 @@ def callback_query(callback):
 
     elif "add company" in callback.data:
         bot.delete_message(callback.message.chat.id, callback.message.message_id)
-        image_question(callback)
+        image_question(callback.message)
 
     elif "meal" in callback.data:
         company_id = int(callback.data.split('-')[0])
         bot.delete_message(callback.message.chat.id, callback.message.message_id)
-        image_question(callback, "MEAL", company_id)
+        image_question(callback.message, "MEAL", company_id)
 
     elif "drink" in callback.data:
         company_id = int(callback.data.split('-')[0])
         bot.delete_message(callback.message.chat.id, callback.message.message_id)
-        image_question(callback, "DRINK", company_id)
+        image_question(callback.message, "DRINK", company_id)
 
     elif "dropbox" in callback.data:
         try:
@@ -129,9 +129,9 @@ def callback_query(callback):
             company_id = int(callback.data.split('-')[1])
             values = {'type': 'PRODUCT', 'product_category': product_category, 'image_way': 'DROPBOX',
                       'company_id': company_id}
-            after_product_image_question(callback, values)
+            enter_product_title(callback.message, values)
         except ValueError:
-            after_company_image_question(callback)
+            choose_kitchen_category(callback.message)
 
     elif "link" in callback.data:
         try:
@@ -139,102 +139,102 @@ def callback_query(callback):
             product_category = callback.data.split('-')[0]
             values = {'type': 'PRODUCT', 'product_category': product_category, 'image_way': 'LINK',
                       'company_id': company_id}
-            after_product_image_question(callback, values)
+            enter_product_title(callback.message, values)
         except ValueError:
-            after_company_image_question(callback)
+            choose_kitchen_category(callback.message)
 
     elif "category" in callback.data:
         category_id = int(callback.data.split('-')[0])
-        after_company_category(callback, category_id)
+        choose_company_country(callback.message, category_id)
 
     elif "country" in callback.data:
         category_id = int(callback.data.split('-')[0])
         country_id = int(callback.data.split('-')[1])
-        after_company_country(callback.message, category_id, country_id)
+        enter_company_title(callback.message, category_id, country_id)
 
 
-def image_question(callback, product_category=None, company_id=None):
+def image_question(message, product_category=None, company_id=None):
     markup = types.InlineKeyboardMarkup()
     dbx_btn = types.InlineKeyboardButton('DROPBOX', callback_data=f'{product_category}-{company_id}-dropbox')
     link_btn = types.InlineKeyboardButton('LINK', callback_data=f'{product_category}-{company_id}-link')
     markup.row(dbx_btn, link_btn)
-    bot.send_message(callback.message.chat.id, 'You will upload image from your PC or use link', reply_markup=markup)
+    bot.send_message(message.chat.id, 'You will upload image from your PC or use link', reply_markup=markup)
 
 
-def after_product_image_question(callback, values):
-    bot.delete_message(callback.message.chat.id, callback.message.message_id)
-    bot.send_message(callback.message.chat.id, 'Enter product title:')
-    bot.register_next_step_handler(callback.message, after_product_title, values)
+def enter_product_title(message, values):
+    bot.delete_message(message.chat.id, message.message_id)
+    bot.send_message(message.chat.id, 'Enter product title:')
+    bot.register_next_step_handler(message, enter_product_description, values)
 
 
-def after_company_image_question(callback):
-    bot.delete_message(callback.message.chat.id, callback.message.message_id)
+def choose_kitchen_category(message):
+    bot.delete_message(message.chat.id, message.message_id)
     categories = db.get_categories()
     markup = types.InlineKeyboardMarkup()
     for category_id, title in categories.items():
         category_btn = types.InlineKeyboardButton(title, callback_data=f'{category_id}-category')
         markup.add(category_btn)
-    bot.send_message(callback.message.chat.id, 'Choose company category:', reply_markup=markup)
+    bot.send_message(message.chat.id, 'Choose company category:', reply_markup=markup)
 
 
-def after_company_category(callback, category_id):
-    bot.delete_message(callback.message.chat.id, callback.message.message_id)
+def choose_company_country(message, category_id):
+    bot.delete_message(message.chat.id, message.message_id)
     countries = db.get_countries()
     markup = types.InlineKeyboardMarkup()
     for country_id, title in countries.items():
         category_btn = types.InlineKeyboardButton(title, callback_data=f'{category_id}-{country_id}-country')
         markup.add(category_btn)
-    bot.send_message(callback.message.chat.id, 'Choose company category:', reply_markup=markup)
+    bot.send_message(message.chat.id, 'Choose company category:', reply_markup=markup)
 
 
-def after_company_country(message, country_id, category_id):
+def enter_company_title(message, country_id, category_id):
     values = {'type': 'COMPANY', 'image_way': 'DROPBOX', 'country_id': country_id, 'category_id': category_id}
     print(values)
 
 
-def after_product_title(message, values):
+def enter_product_description(message, values):
     values.update({'title': message.text})
     bot.send_message(message.chat.id, 'Enter product description:')
-    bot.register_next_step_handler(message, after_product_description, values)
+    bot.register_next_step_handler(message, enter_product_composition, values)
 
 
-def after_product_description(message, values):
+def enter_product_composition(message, values):
     values.update({'description': message.text})
     bot.send_message(message.chat.id, 'Enter product composition:')
-    bot.register_next_step_handler(message, after_product_composition, values)
+    bot.register_next_step_handler(message, enter_product_price, values)
 
 
-def after_product_composition(message, values):
+def enter_product_price(message, values):
     values.update({'composition': message.text})
     bot.send_message(message.chat.id, 'Enter product price (use only numbers):')
-    bot.register_next_step_handler(message, after_product_price, values)
+    bot.register_next_step_handler(message, send_image_or_link, values)
 
 
-def after_product_price(message, values):
+def send_image_or_link(message, values):
     values.update({'price': float(message.text)})
     if values.get('image_way') == 'DROPBOX':
         bot.send_message(message.chat.id, 'Send here your image')
-        bot.register_next_step_handler(message, after_send_image, values)
+        bot.register_next_step_handler(message, upload_image, values)
     elif values.get('image_way') == 'LINK':
         bot.send_message(message.chat.id, 'Enter your link')
-        bot.register_next_step_handler(message, after_send_link, values)
+        bot.register_next_step_handler(message, add_item_with_link, values)
 
 
-def after_send_image(message, values):
+def upload_image(message, values):
     photo_id = bot.get_file(message.photo[len(message.photo) - 1].file_id).file_id
     photo_file = bot.get_file(photo_id)
     photo_bytes = bot.download_file(photo_file.file_path)
     dropbox.upload_file(message, photo_bytes, bot, values)
 
 
-def after_send_link(message, values):
+def add_item_with_link(message, values):
     values.update({'image_link': message.text})
     db.add_new_item(values)
     bot.send_message(message.chat.id, 'Item added')
     main_menu(message)
 
 
-def after_upload_image(message, values):
+def add_item_with_dropbox_link(message, values):
     db.add_new_item(values)
     bot.send_message(message.chat.id, 'Item added')
     main_menu(message)
@@ -266,7 +266,7 @@ def main_menu(message):
     bot.send_message(message.chat.id, "Main menu. Choose the option:", reply_markup=markup)
 
 
-def after_question(message, user_id):
+def send_question_to_support_group(message, user_id):
     bot.reply_to(message, "Your question was sent")
     main_menu(message)
     db.add_pending_user(user_id)
@@ -286,18 +286,18 @@ def after_question(message, user_id):
                      f"\n<b>Message:</b> \"{message.text}\"", reply_markup=markup, parse_mode='HTML')
 
 
-def after_login_username(message):
+def enter_login_password(message):
     username = message.text
     bot.send_message(message.chat.id, "Enter password")
-    bot.register_next_step_handler(message, after_login_password, username)
+    bot.register_next_step_handler(message, login_result, username)
 
 
-def after_registration_username(message):
+def enter_email(message):
     username = message.text
     if username not in db.get_consumers_usernames() and re.search(r'^[a-zA-Z][a-zA-Z0-9_]*$',
                                                                   username) is not None:
         bot.send_message(message.chat.id, "Enter email")
-        bot.register_next_step_handler(message, after_registration_email, username)
+        bot.register_next_step_handler(message, enter_registration_password, username)
 
     elif username in db.get_consumers_usernames():
         bot.send_message(message.chat.id, "This username is already in use")
@@ -309,12 +309,12 @@ def after_registration_username(message):
         main_menu(message)
 
 
-def after_registration_email(message, username):
+def enter_registration_password(message, username):
     email = message.text
     if email not in db.get_consumers_emails() and re.search(r'^[a-z0-9]+[._]?[a-z0-9]+@\w+[.]\w+$',
                                                             email) is not None:
         bot.send_message(message.chat.id, "Enter password")
-        bot.register_next_step_handler(message, after_registration_password, username, email)
+        bot.register_next_step_handler(message, enter_confirm_password, username, email)
 
     elif email in db.get_consumers_emails():
         bot.send_message(message.chat.id, "This email is already in use")
@@ -325,7 +325,7 @@ def after_registration_email(message, username):
         main_menu(message)
 
 
-def after_registration_password(message, username, email):
+def enter_confirm_password(message, username, email):
     password = message.text
     if re.search(r'^(?=.*[a-zA-Z])(?=.*\d)(?=.*[\W_]).{6,15}$', password) is not None:
         bot.send_message(message.chat.id, "Confirm password")
@@ -352,7 +352,7 @@ def registration_result(message, username, email, password):
         main_menu(message)
 
 
-def after_login_password(message, username):
+def login_result(message, username):
     is_correct_username = db.is_user_exist(username)
     is_correct_password = db.verify_password(username, message.text)
 
@@ -367,7 +367,7 @@ def after_login_password(message, username):
         main_menu(message)
 
 
-def after_answer(message, chat_id, message_id, user_id, question_message_id):
+def send_answer(message, chat_id, message_id, user_id, question_message_id):
     bot.send_message(chat_id, f'Your have got an answer: \n<b>{message.text}</b>', parse_mode='HTML',
                      reply_to_message_id=question_message_id)
     bot.reply_to(message, 'Your answer was sent')
@@ -382,7 +382,7 @@ def answer_message(callback):
     question_message_id = text_split[2]
     message_id = callback.message.message_id
     bot.send_message(callback.message.chat.id, "Enter your answer: ")
-    bot.register_next_step_handler(callback.message, after_answer, chat_id, message_id, user_id, question_message_id)
+    bot.register_next_step_handler(callback.message, send_answer, chat_id, message_id, user_id, question_message_id)
 
 
 def ignore_message(callback):
