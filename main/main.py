@@ -3,11 +3,11 @@ import telebot
 import dropbox_factory
 import database_factory as db
 from config import GROUP_ID, TG_TOKEN
-from database_factory import Database
+from database_factory import PaginationData
 
 from telebot import types
 
-database = Database()
+pagination = PaginationData()
 
 bot = telebot.TeleBot(TG_TOKEN)
 
@@ -247,8 +247,8 @@ def companies_catalog(callback):
     page = int(callback.data.split('-')[0])
 
     # Number of rows and data for 1 page
-    data, count = database.data_list_for_page(tables='company', order='title', page=page,
-                                              skip_size=1)  # SkipSize - display by one element
+    data, count = pagination.data_list_for_page(tables='company', order='title', page=page,
+                                                skip_size=1)  # SkipSize - display by one element
 
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton(text='Hide', callback_data='unseen'))
@@ -281,9 +281,9 @@ def products_catalog(callback):
     company_page = int(text_split[2])
 
     # Number of rows and data for 1 page
-    data, count = database.data_list_for_page(tables='product', order='title', page=page,
-                                              skip_size=1,  # SkipSize - display by one element
-                                              wheres=f"WHERE company_id = {company_id}")
+    data, count = pagination.data_list_for_page(tables='product', order='title', page=page,
+                                                skip_size=1,  # SkipSize - display by one element
+                                                wheres=f"WHERE company_id = {company_id}")
 
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton(text='Hide', callback_data='unseen'))

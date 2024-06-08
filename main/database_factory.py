@@ -8,7 +8,7 @@ from passlib.hash import bcrypt
 engine = sqlalchemy.create_engine(f"postgresql+psycopg2://{postgres_username}:{postgres_password}@localhost:5432/Test")
 
 
-class Database():
+class PaginationData():
     def __init__(self):
         self.conn = psycopg2.connect(database='Test', user='postgres',
                                      password='root', host='localhost', port=5432)
