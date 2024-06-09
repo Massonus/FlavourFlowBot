@@ -105,6 +105,24 @@ def delete_product(message, bot, product_id):
         dropbox.delete_file(message, bot, values)
 
 
+def delete_company(message, bot, company_id):
+    data = pd.read_sql('product', engine)
+    products_in_company = data.loc[data['company_id'] == company_id, 'id'].values.tolist()
+    for product_id in products_in_company:
+        delete_product(message, bot, product_id)
+
+    data = pd.read_sql('company', engine)
+    image_link = data.loc[data['id'] == company_id, 'image_link'].values[0]
+
+    db = PaginationData()
+    sql = f"DELETE FROM company WHERE id = {company_id}"
+    db.cursor.execute(sql)
+    db.conn.commit()
+    if "dropbox" in image_link:
+        values = {'type': 'company', 'id': str(company_id)}
+        dropbox.delete_file(message, bot, values)
+
+
 def get_username_by_telegram_id(user_id):
     data = pd.read_sql('consumer', engine)
     try:

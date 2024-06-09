@@ -150,10 +150,19 @@ def callback_query(callback):
         product_id = int(callback.data.split('-')[0])
         confirm_delete_product(callback.message, product_id)
 
+    elif "delete-company" in callback.data:
+        company_id = int(callback.data.split('-')[0])
+        confirm_delete_company(callback.message, company_id)
+
     elif "conf-del-prod" in callback.data:
         product_id = int(callback.data.split('-')[0])
         callback.message.from_user.id = callback.from_user.id
         delete_product(callback.message, product_id)
+
+    elif "conf-del-comp" in callback.data:
+        company_id = int(callback.data.split('-')[0])
+        callback.message.from_user.id = callback.from_user.id
+        delete_company(callback.message, company_id)
 
     elif "deny-delete" in callback.data:
         bot.delete_message(callback.message.chat.id, callback.message.message_id)
@@ -167,12 +176,28 @@ def confirm_delete_product(message, product_id):
     dbx_btn = types.InlineKeyboardButton('✅', callback_data=f'{product_id}-conf-del-prod')
     link_btn = types.InlineKeyboardButton('❌', callback_data=f'deny-delete')
     markup.row(dbx_btn, link_btn)
-    bot.send_message(message.chat.id, 'Do you really want to delete this product', reply_markup=markup)
+    bot.send_message(message.chat.id, 'Do you really want to delete this product?', reply_markup=markup)
+
+
+def confirm_delete_company(message, company_id):
+    bot.delete_message(message.chat.id, message.message_id)
+    markup = types.InlineKeyboardMarkup()
+    dbx_btn = types.InlineKeyboardButton('✅', callback_data=f'{company_id}-conf-del-comp')
+    link_btn = types.InlineKeyboardButton('❌', callback_data=f'deny-delete')
+    markup.row(dbx_btn, link_btn)
+    bot.send_message(message.chat.id, 'Do you really want to delete this company?', reply_markup=markup)
 
 
 def delete_product(message, product_id):
     bot.delete_message(message.chat.id, message.message_id)
     db.delete_product(message, bot, product_id)
+    bot.send_message(message.chat.id, 'Deleted successfully')
+    main_menu(message)
+
+
+def delete_company(message, company_id):
+    bot.delete_message(message.chat.id, message.message_id)
+    db.delete_company(message, bot, company_id)
     bot.send_message(message.chat.id, 'Deleted successfully')
     main_menu(message)
 
@@ -447,7 +472,7 @@ def companies_catalog(callback):
 
     if db.is_admin(callback.from_user.id):
         add_btn = types.InlineKeyboardButton('Add item', callback_data='add company')
-        delete_btn = types.InlineKeyboardButton('Delete item', callback_data=' ')
+        delete_btn = types.InlineKeyboardButton('Delete item', callback_data=f'{data[3]}-delete-company')
 
         markup.add(add_btn)
         markup.add(delete_btn)
