@@ -83,6 +83,10 @@ def callback_query(callback):
         callback.message.from_user.id = callback.from_user.id
         print_profile_info(callback.message)
 
+    elif callback.data == "orders":
+        callback.message.from_user.id = callback.from_user.id
+        print_orders_info(callback.message)
+
     elif callback.data == "main menu":
         bot.delete_message(callback.message.chat.id, callback.message.message_id)
         callback.message.from_user.id = callback.from_user.id
@@ -190,6 +194,20 @@ def print_profile_info(message):
                                       f'\nUsername: {user_profile.get('username')}'
                                       f'\nEmail: {user_profile.get('email')}'
                                       f'\nBonuses: {user_profile.get('bonuses')}')
+    main_menu(message)
+
+
+def print_orders_info(message):
+    orders = db.get_orders_info(message.from_user.id)
+    print(orders)
+    bot.send_message(message.chat.id, f'Your orders:')
+    for order in orders:
+        bot.send_message(message.chat.id, f'Company: {db.get_company_title_by_id(order.get('company_id'))}'
+                                          f'\nEarned bonuses: {order.get('earned_bonuses')}'
+                                          f'\nDate and time: {order.get('date').date()}, '
+                                          f'{order.get('time').isoformat(timespec='minutes')}'
+                                          f'\nAddress: {order.get('address')}')
+
     main_menu(message)
 
 
@@ -332,7 +350,7 @@ def main_menu(message):
 
     if db.is_authorized(message.from_user.id):
         profile_btn = types.InlineKeyboardButton('🎗️ Profile', callback_data='profile')
-        orders_btn = types.InlineKeyboardButton('🧾 Orders', callback_data=' ')
+        orders_btn = types.InlineKeyboardButton('🧾 Orders', callback_data='orders')
         markup.add(profile_btn)
         markup.add(orders_btn)
 

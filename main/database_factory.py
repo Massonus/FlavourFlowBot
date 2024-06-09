@@ -128,10 +128,29 @@ def get_profile_info(telegram_id):
     return data.loc[data['telegram_id'] == telegram_id].to_dict(orient='records')[0]
 
 
+def get_orders_info(telegram_id):
+    user_id = get_user_id_by_telegram_id(telegram_id)
+    data = pd.read_sql('orders', engine)
+    return data.loc[data['user_id'] == user_id].to_dict(orient='records')
+
+
 def get_username_by_telegram_id(user_id):
     data = pd.read_sql('consumer', engine)
     try:
         return data.loc[data['telegram_id'] == user_id, 'username'].values[0]
+    except IndexError:
+        return "Unauthorized"
+
+
+def get_company_title_by_id(company_id):
+    data = pd.read_sql('company', engine)
+    return data.loc[data['id'] == company_id, 'title'].values[0]
+
+
+def get_user_id_by_telegram_id(user_id):
+    data = pd.read_sql('consumer', engine)
+    try:
+        return data.loc[data['telegram_id'] == user_id, 'id'].values[0]
     except IndexError:
         return "Unauthorized"
 
