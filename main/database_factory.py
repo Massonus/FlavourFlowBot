@@ -246,12 +246,23 @@ def add_pending_user(user_id):
 
 
 def add_new_consumer(username, email, password, telegram_id):
-    data = pd.read_sql('consumer', engine)
-    df1 = pd.DataFrame(
-        [{'id': max(data['id'].values + 1), 'username': username, 'password': bcrypt.hash(password), 'bonuses': 0,
+    consumer_data = pd.read_sql('consumer', engine)
+    user_id = max(consumer_data['id'].values + 1)
+    consumer_data = pd.DataFrame(
+        [{'id': user_id, 'username': username, 'password': bcrypt.hash(password), 'bonuses': 0,
           'email': email,
           'redactor': 'telegram registration', 'telegram_id': telegram_id}])
-    df1.to_sql('consumer', engine, if_exists='append', index=False, index_label='id')
+    consumer_data.to_sql('consumer', engine, if_exists='append', index=False, index_label='id')
+
+    basket_data = pd.read_sql('basket', engine)
+    wish_data = pd.read_sql('wish_object', engine)
+    basket_id = max(basket_data['id'].values + 1)
+    wish_id = max(wish_data['id'].values + 1)
+    basket_data = pd.DataFrame([{'id': basket_id, 'user_id': user_id}])
+    wish_data = pd.DataFrame([{'id': wish_id, 'user_id': user_id}])
+    basket_data.to_sql('basket', engine, if_exists='append', index=False, index_label='id')
+    wish_data.to_sql('wishes', engine, if_exists='append', index=False, index_label='id')
+
 
 
 def add_new_item(values):

@@ -616,7 +616,10 @@ def products_catalog(callback):
                              "The product list of this company is empty or not enough. But you can add a product",
                              reply_markup=markup)
         else:
-            bot.send_message(callback.message.chat.id, "The product list of this company is empty")
+            bot.send_message(callback.message.chat.id,
+                             "The product list of this company is empty or not enough. "
+                             "Wait until administrator add products")
+            callback.message.from_user.id = callback.from_user.id
             main_menu(callback.message)
 
 
