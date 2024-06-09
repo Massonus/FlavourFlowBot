@@ -6,15 +6,23 @@ from sqlalchemy import exc
 import config
 from passlib.hash import bcrypt
 
+# engine = sqlalchemy.create_engine(
+#     f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_test_password}@{config.postgres_test_host}:5432"
+#     f"/{config.postgres_test_database}")
+
 engine = sqlalchemy.create_engine(
-    f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_test_password}@{config.postgres_test_host}:5432"
-    f"/{config.postgres_test_database}")
+    f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_password}@{config.postgres_host}:5432"
+    f"/{config.postgres_database}")
 
 
 class PaginationData():
     def __init__(self):
-        self.conn = psycopg2.connect(database=f'{config.postgres_test_database}', user=f'{config.postgres_username}',
-                                     password=f'{config.postgres_test_password}', host='localhost', port=5432)
+        self.conn = psycopg2.connect(database=f'{config.postgres_database}', user=f'{config.postgres_username}',
+                                     password=f'{config.postgres_password}', host=f'{config.postgres_host}', port=5432)
+
+        # self.conn = psycopg2.connect(database=f'{config.postgres_test_database}', user=f'{config.postgres_username}',
+        #                              password=f'{config.postgres_test_password}', host=f'{config.postgres_test_host}',
+        #                              port=5432)
         self.cursor = self.conn.cursor()
 
     def data_list_for_page(self, tables, order, schema='public', page=1, skip_size=1, wheres=''):
@@ -52,7 +60,7 @@ def get_authorization_users():
         users = data['telegram_id'].values.tolist()
     except KeyError:
         data['telegram_id'] = [0] * len(data)
-        data.to_sql('consumer', engine, if_exists='replace', index=False, index_label='id')
+        data.to_sql('consumer', engine, index=False, index_label='id')
     return users
 
 
@@ -235,14 +243,17 @@ def verify_password(username, password):
 
 
 def change_consumer_telebot_id(username, user_id):
-    data = pd.read_sql('consumer', engine)
-    data.loc[data['username'] == username, 'telegram_id'] = user_id
-    data.to_sql('consumer', engine, if_exists='replace', index=False, index_label='id')
+    sql = (f"UPDATE public.consumer "
+           f"SET telegram_id={user_id} "
+           f"WHERE username='{username}' ")
+    db = PaginationData()
+    db.cursor.execute(sql)
+    db.conn.commit()
 
 
 def add_pending_user(user_id):
-    df1 = pd.DataFrame([{'user_id': user_id}])
-    df1.to_sql('pending_users', engine, if_exists='append', index=False, index_label='id')
+    data = pd.DataFrame([{'user_id': user_id}])
+    data.to_sql('pending_users', engine, if_exists='append', index=False, index_label='id')
 
 
 def add_new_consumer(username, email, password, telegram_id):
@@ -262,7 +273,6 @@ def add_new_consumer(username, email, password, telegram_id):
     wish_data = pd.DataFrame([{'id': wish_id, 'user_id': user_id}])
     basket_data.to_sql('basket', engine, if_exists='append', index=False, index_label='id')
     wish_data.to_sql('wishes', engine, if_exists='append', index=False, index_label='id')
-
 
 
 def add_new_item(values):
