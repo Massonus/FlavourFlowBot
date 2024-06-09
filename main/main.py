@@ -83,7 +83,9 @@ def callback_query(callback):
         product_id = int(callback.data.split('-')[0])
         db.add_to_basket(product_id, callback.from_user.id, bot, callback.message)
 
-    # elif "add-wish" in callback.data:
+    elif "add-wish" in callback.data:
+        product_id = int(callback.data.split('-')[0])
+        db.add_to_wish(product_id, callback.from_user.id, bot, callback.message)
 
     elif callback.data == "profile":
         callback.message.from_user.id = callback.from_user.id
