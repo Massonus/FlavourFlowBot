@@ -79,6 +79,12 @@ def callback_query(callback):
     elif "products" in callback.data:
         products_catalog(callback)
 
+    elif "add-basket" in callback.data:
+        product_id = int(callback.data.split('-')[0])
+        db.add_to_basket(product_id, callback.from_user.id, bot, callback.message)
+
+    # elif "add-wish" in callback.data:
+
     elif callback.data == "profile":
         callback.message.from_user.id = callback.from_user.id
         print_profile_info(callback.message)
@@ -199,7 +205,6 @@ def print_profile_info(message):
 
 def print_orders_info(message):
     orders = db.get_orders_info(message.from_user.id)
-    print(orders)
     bot.send_message(message.chat.id, f'Your orders:')
     for order in orders:
         bot.send_message(message.chat.id, f'Company: {db.get_company_title_by_id(order.get('company_id'))}'
@@ -562,8 +567,8 @@ def products_catalog(callback):
             markup.add(delete_btn)
 
         if db.is_authorized(callback.from_user.id):
-            add_to_basket = types.InlineKeyboardButton('Add to basket', callback_data=' ')
-            add_to_wishlist = types.InlineKeyboardButton('Add to wishlist', callback_data=' ')
+            add_to_basket = types.InlineKeyboardButton('Add to basket', callback_data=f'{data[2]}-add-basket')
+            add_to_wishlist = types.InlineKeyboardButton('Add to wishlist', callback_data=f'{data[2]}-add-wish')
             markup.row(add_to_basket, add_to_wishlist)
 
         if page == 1:

@@ -134,6 +134,41 @@ def get_orders_info(telegram_id):
     return data.loc[data['user_id'] == user_id].to_dict(orient='records')
 
 
+def add_to_basket(product_id, telegram_id, bot, message):
+    product_data = pd.read_sql('product', engine)
+    basket_object_data = pd.read_sql('basket_object', engine)
+    basket_data = pd.read_sql('basket', engine)
+    user_id = get_user_id_by_telegram_id(telegram_id)
+
+    product = product_data.loc[product_data['id'] == product_id].to_dict(orient='records')[0]
+
+    basket_id = basket_data.loc[basket_data['user_id'] == user_id, 'id'].values[0]
+
+    sql = (f"SELECT * FROM public.basket_object AS obj "
+           f"WHERE product_id = {product_id} AND user_id = {user_id}")
+    db = PaginationData()
+    db.cursor.execute(sql)
+    product_params = db.cursor.fetchone()
+
+    if product_params is None:
+
+        df1 = pd.DataFrame(
+            [{'title': product.get('title'), 'image_link': product.get('image_link'), 'user_id': user_id,
+              'product_id': product_id, 'id': max(basket_object_data['id'].values + 1),
+              'company_id': product.get('company_id'), 'basket_id': basket_id, 'price': product.get('price'),
+              'amount': 1}])
+        df1.to_sql('basket_object', engine, if_exists='append', index=False, index_label='id')
+        bot.send_message(message.chat.id, 'Added to your basket')
+    else:
+        amount = basket_object_data.loc[basket_object_data['id'] == product_params[4], 'amount'].values[0]
+        sql = (f"UPDATE public.basket_object "
+               f"SET amount={amount + 1} "
+               f"WHERE id={product_params[4]}")
+        db.cursor.execute(sql)
+        db.conn.commit()
+        bot.send_message(message.chat.id, f'Changed amount to {amount + 1}')
+
+
 def get_username_by_telegram_id(user_id):
     data = pd.read_sql('consumer', engine)
     try:
