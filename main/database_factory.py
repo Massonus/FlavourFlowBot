@@ -123,6 +123,11 @@ def delete_company(message, bot, company_id):
         dropbox.delete_file(message, bot, values)
 
 
+def get_profile_info(telegram_id):
+    data = pd.read_sql('consumer', engine)
+    return data.loc[data['telegram_id'] == telegram_id].to_dict(orient='records')[0]
+
+
 def get_username_by_telegram_id(user_id):
     data = pd.read_sql('consumer', engine)
     try:

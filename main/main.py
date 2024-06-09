@@ -28,6 +28,14 @@ def start(message):
     main_menu(message)
 
 
+@bot.message_handler(commands=['menu'])
+def start(message):
+    if not message.chat.type == 'private':
+        bot.send_message(message.chat.id, "I don't work in groups")
+        return False
+    main_menu(message)
+
+
 @bot.message_handler(commands=['logout'])
 def command_help(message):
     if not message.chat.type == 'private':
@@ -70,6 +78,10 @@ def callback_query(callback):
 
     elif "products" in callback.data:
         products_catalog(callback)
+
+    elif callback.data == "profile":
+        callback.message.from_user.id = callback.from_user.id
+        print_profile_info(callback.message)
 
     elif callback.data == "main menu":
         bot.delete_message(callback.message.chat.id, callback.message.message_id)
@@ -125,7 +137,7 @@ def callback_query(callback):
                       'company_id': company_id}
             enter_product_title(callback.message, values)
         except ValueError:
-            choose_kitchen_category(callback.message)
+            choose_kitchen_category(callback.message, 'DROPBOX')
 
     elif "link" in callback.data:
         try:
@@ -135,16 +147,18 @@ def callback_query(callback):
                       'company_id': company_id}
             enter_product_title(callback.message, values)
         except ValueError:
-            choose_kitchen_category(callback.message)
+            choose_kitchen_category(callback.message, 'LINK')
 
     elif "category" in callback.data:
         category_id = int(callback.data.split('-')[0])
-        choose_company_country(callback.message, category_id)
+        image_way = callback.data.split('-')[1]
+        choose_company_country(callback.message, category_id, image_way)
 
     elif "country" in callback.data:
         category_id = int(callback.data.split('-')[0])
         country_id = int(callback.data.split('-')[1])
-        enter_company_title(callback.message, category_id, country_id)
+        image_way = callback.data.split('-')[2]
+        enter_company_title(callback.message, category_id, country_id, image_way)
 
     elif "delete-product" in callback.data:
         product_id = int(callback.data.split('-')[0])
@@ -170,6 +184,15 @@ def callback_query(callback):
         main_menu(callback.message)
 
 
+def print_profile_info(message):
+    user_profile = db.get_profile_info(message.from_user.id)
+    bot.send_message(message.chat.id, f'Flavour Flow user information:'
+                                      f'\nUsername: {user_profile.get('username')}'
+                                      f'\nEmail: {user_profile.get('email')}'
+                                      f'\nBonuses: {user_profile.get('bonuses')}')
+    main_menu(message)
+
+
 def confirm_delete_product(message, product_id):
     bot.delete_message(message.chat.id, message.message_id)
     markup = types.InlineKeyboardMarkup()
@@ -185,7 +208,9 @@ def confirm_delete_company(message, company_id):
     dbx_btn = types.InlineKeyboardButton('✅', callback_data=f'{company_id}-conf-del-comp')
     link_btn = types.InlineKeyboardButton('❌', callback_data=f'deny-delete')
     markup.row(dbx_btn, link_btn)
-    bot.send_message(message.chat.id, 'Do you really want to delete this company?', reply_markup=markup)
+    bot.send_message(message.chat.id,
+                     'Do you really want to delete this company? All products inside will be deleted too',
+                     reply_markup=markup)
 
 
 def delete_product(message, product_id):
@@ -216,28 +241,29 @@ def enter_product_title(message, values):
     bot.register_next_step_handler(message, enter_product_description, values)
 
 
-def choose_kitchen_category(message):
+def choose_kitchen_category(message, image_way):
     bot.delete_message(message.chat.id, message.message_id)
     categories = db.get_categories()
     markup = types.InlineKeyboardMarkup()
     for category_id, title in categories.items():
-        category_btn = types.InlineKeyboardButton(title, callback_data=f'{category_id}-category')
+        category_btn = types.InlineKeyboardButton(title, callback_data=f'{category_id}-{image_way}-category')
         markup.add(category_btn)
     bot.send_message(message.chat.id, 'Choose company category:', reply_markup=markup)
 
 
-def choose_company_country(message, category_id):
+def choose_company_country(message, category_id, image_way):
     bot.delete_message(message.chat.id, message.message_id)
     countries = db.get_countries()
     markup = types.InlineKeyboardMarkup()
     for country_id, title in countries.items():
-        category_btn = types.InlineKeyboardButton(title, callback_data=f'{category_id}-{country_id}-country')
+        category_btn = types.InlineKeyboardButton(title,
+                                                  callback_data=f'{category_id}-{country_id}-{image_way}-country')
         markup.add(category_btn)
     bot.send_message(message.chat.id, 'Choose company category:', reply_markup=markup)
 
 
-def enter_company_title(message, country_id, category_id):
-    values = {'type': 'COMPANY', 'image_way': 'DROPBOX', 'country_id': country_id, 'category_id': category_id}
+def enter_company_title(message, country_id, category_id, image_way):
+    values = {'type': 'COMPANY', 'image_way': image_way, 'country_id': country_id, 'category_id': category_id}
     bot.delete_message(message.chat.id, message.message_id)
     bot.send_message(message.chat.id, 'Enter company title:')
     bot.register_next_step_handler(message, enter_company_description, values)
@@ -305,7 +331,7 @@ def main_menu(message):
     markup = types.InlineKeyboardMarkup()
 
     if db.is_authorized(message.from_user.id):
-        profile_btn = types.InlineKeyboardButton('🎗️ Profile', callback_data=' ')
+        profile_btn = types.InlineKeyboardButton('🎗️ Profile', callback_data='profile')
         orders_btn = types.InlineKeyboardButton('🧾 Orders', callback_data=' ')
         markup.add(profile_btn)
         markup.add(orders_btn)
@@ -496,12 +522,11 @@ def companies_catalog(callback):
 
 
 def products_catalog(callback):
+    text_split = callback.data.split('-')
+    page = int(text_split[0])
+    company_id = int(text_split[1])
+    company_page = int(text_split[2])
     try:
-        text_split = callback.data.split('-')
-        page = int(text_split[0])
-        company_id = int(text_split[1])
-        company_page = int(text_split[2])
-
         # Number of rows and data for 1 page
         data, count = pagination.data_list_for_page(tables='product', order='title', page=page,
                                                     skip_size=1,  # skip_size - display by one element
@@ -547,15 +572,18 @@ def products_catalog(callback):
                                                                         f'<b>Composition:</b> <i>{data[3]}</i>\n',
                        parse_mode="HTML", reply_markup=markup)
     except IndexError:
-        bot.send_message(callback.message.chat.id, "The product list of this company is empty")
-
-
-@bot.message_handler()
-def info(message):
-    if message.text.lower() == "hi":
-        bot.send_message(message.chat.id, f'Hello {message.from_user.first_name}')
-    elif message.text.lower() == "id":
-        bot.reply_to(message, f'ID: {message.from_user.id}')
+        if db.is_admin(callback.from_user.id):
+            markup = types.InlineKeyboardMarkup()
+            add_btn = types.InlineKeyboardButton('Add item', callback_data=f'{company_id}-add product')
+            companies_btn = types.InlineKeyboardButton('Return to companies', callback_data='companies')
+            markup.add(add_btn)
+            markup.add(companies_btn)
+            bot.send_message(callback.message.chat.id,
+                             "The product list of this company is empty or not enough. But you can add a product",
+                             reply_markup=markup)
+        else:
+            bot.send_message(callback.message.chat.id, "The product list of this company is empty")
+            main_menu(callback.message)
 
 
 if __name__ == '__main__':
