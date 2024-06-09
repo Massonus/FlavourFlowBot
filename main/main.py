@@ -172,7 +172,7 @@ def confirm_delete_product(message, product_id):
 
 def delete_product(message, product_id):
     bot.delete_message(message.chat.id, message.message_id)
-    db.delete_product(product_id)
+    db.delete_product(message, bot, product_id)
     bot.send_message(message.chat.id, 'Deleted successfully')
     main_menu(message)
 

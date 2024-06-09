@@ -39,7 +39,7 @@ def after_init_token(message, bot, auth_flow, photo_bytes, values):
     bot.register_next_step_handler(message, upload_file, photo_bytes, bot, values)
 
 
-def get_dbx(message, photo_bytes, bot, values):
+def get_dbx(message, bot, values, photo_bytes=None):
     token = pandas.read_sql('access_token', engine).at[0, "token"]
 
     try:
@@ -51,7 +51,7 @@ def get_dbx(message, photo_bytes, bot, values):
 
 
 def upload_file(message, photo_bytes, bot, values):
-    dbx = get_dbx(message, photo_bytes, bot, values)
+    dbx = get_dbx(message, bot, values, photo_bytes)
     try:
         data = pandas.read_sql(values.get('type').lower(), engine)
         path = "/FlowImages/" + values.get('type').upper() + "/" + values.get('type') + str(max(
@@ -66,3 +66,13 @@ def upload_file(message, photo_bytes, bot, values):
         main.add_item_with_dropbox_link(message, values)
     except AttributeError:
         print("Waiting...")
+
+
+def delete_file(message, bot, values):
+    path = "/FlowImages/" + values.get('type').upper() + "/" + values.get('type') + values.get('id') + ".jpg"
+
+    dbx = get_dbx(message, bot, values)
+    try:
+        dbx.files_delete_v2(path)
+    except dropbox.exceptions.ApiError as error:
+        bot.send_message(message.chat.id, f'Something is wrong {error}')

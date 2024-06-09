@@ -1,6 +1,7 @@
 import sqlalchemy
 import psycopg2
 import pandas as pd
+import dropbox_factory as dropbox
 from sqlalchemy import exc
 from config import postgres_username, postgres_password
 from passlib.hash import bcrypt
@@ -91,11 +92,17 @@ def is_user_exist(username):
         return False
 
 
-def delete_product(product_id):
+def delete_product(message, bot, product_id):
+    data = pd.read_sql('product', engine)
+    image_link = data.loc[data['id'] == product_id, 'image_link'].values[0]
+
     db = PaginationData()
     sql = f"DELETE FROM product WHERE id = {product_id}"
     db.cursor.execute(sql)
     db.conn.commit()
+    if "dropbox" in image_link:
+        values = {'type': 'product', 'id': str(product_id)}
+        dropbox.delete_file(message, bot, values)
 
 
 def get_username_by_telegram_id(user_id):
