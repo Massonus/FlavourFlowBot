@@ -59,13 +59,7 @@ def redirect(message):
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(callback):
-    if callback.data == 'delete':
-        bot.delete_message(callback.message.chat.id, callback.message.message_id)
-
-    elif callback.data == 'edit':
-        bot.edit_message_caption('Edit', callback.message.chat.id, callback.message.message_id)
-
-    elif "answer" in callback.data:
+    if "answer" in callback.data:
         answer_message(callback)
 
     elif "ignore" in callback.data:
@@ -151,6 +145,36 @@ def callback_query(callback):
         category_id = int(callback.data.split('-')[0])
         country_id = int(callback.data.split('-')[1])
         enter_company_title(callback.message, category_id, country_id)
+
+    elif "delete-product" in callback.data:
+        product_id = int(callback.data.split('-')[0])
+        confirm_delete_product(callback.message, product_id)
+
+    elif "conf-del-prod" in callback.data:
+        product_id = int(callback.data.split('-')[0])
+        callback.message.from_user.id = callback.from_user.id
+        delete_product(callback.message, product_id)
+
+    elif "deny-delete" in callback.data:
+        bot.delete_message(callback.message.chat.id, callback.message.message_id)
+        callback.message.from_user.id = callback.from_user.id
+        main_menu(callback.message)
+
+
+def confirm_delete_product(message, product_id):
+    bot.delete_message(message.chat.id, message.message_id)
+    markup = types.InlineKeyboardMarkup()
+    dbx_btn = types.InlineKeyboardButton('✅', callback_data=f'{product_id}-conf-del-prod')
+    link_btn = types.InlineKeyboardButton('❌', callback_data=f'deny-delete')
+    markup.row(dbx_btn, link_btn)
+    bot.send_message(message.chat.id, 'Do you really want to delete this product', reply_markup=markup)
+
+
+def delete_product(message, product_id):
+    bot.delete_message(message.chat.id, message.message_id)
+    db.delete_product(product_id)
+    bot.send_message(message.chat.id, 'Deleted successfully')
+    main_menu(message)
 
 
 def image_question(message, product_category=None, company_id=None):
@@ -464,7 +488,7 @@ def products_catalog(callback):
 
         if db.is_admin(callback.from_user.id):
             add_btn = types.InlineKeyboardButton('Add item', callback_data=f'{company_id}-add product')
-            delete_btn = types.InlineKeyboardButton('Delete item', callback_data=' ')
+            delete_btn = types.InlineKeyboardButton('Delete item', callback_data=f'{data[2]}-delete-product')
 
             markup.add(add_btn)
             markup.add(delete_btn)

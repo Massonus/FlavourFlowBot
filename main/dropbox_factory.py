@@ -57,6 +57,8 @@ def upload_file(message, photo_bytes, bot, values):
         path = "/FlowImages/" + values.get('type').upper() + "/" + values.get('type') + str(max(
             data['id'].values + 1)) + ".jpg"
 
+        bot.send_message(message.chat.id, "Don't do anything and wait an answer")
+
         dbx.files_upload(photo_bytes, path)
         url = dbx.sharing_create_shared_link_with_settings(path).url.replace("www.dropbox.com",
                                                                              "dl.dropboxusercontent.com")

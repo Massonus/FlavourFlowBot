@@ -91,6 +91,13 @@ def is_user_exist(username):
         return False
 
 
+def delete_product(product_id):
+    db = PaginationData()
+    sql = f"DELETE FROM product WHERE id = {product_id}"
+    db.cursor.execute(sql)
+    db.conn.commit()
+
+
 def get_username_by_telegram_id(user_id):
     data = pd.read_sql('consumer', engine)
     try:
