@@ -3,16 +3,18 @@ import psycopg2
 import pandas as pd
 import dropbox_factory as dropbox
 from sqlalchemy import exc
-from config import postgres_username, postgres_password
+import config
 from passlib.hash import bcrypt
 
-engine = sqlalchemy.create_engine(f"postgresql+psycopg2://{postgres_username}:{postgres_password}@localhost:5432/Test")
+engine = sqlalchemy.create_engine(
+    f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_test_password}@{config.postgres_test_host}:5432"
+    f"/{config.postgres_test_database}")
 
 
 class PaginationData():
     def __init__(self):
-        self.conn = psycopg2.connect(database='Test', user='postgres',
-                                     password='root', host='localhost', port=5432)
+        self.conn = psycopg2.connect(database=f'{config.postgres_test_database}', user=f'{config.postgres_username}',
+                                     password=f'{config.postgres_test_password}', host='localhost', port=5432)
         self.cursor = self.conn.cursor()
 
     def data_list_for_page(self, tables, order, schema='public', page=1, skip_size=1, wheres=''):

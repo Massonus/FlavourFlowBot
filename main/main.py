@@ -319,10 +319,15 @@ def enter_product_price(message, values):
 
 
 def send_image_or_link(message, values):
-    try:
-        values.update({'price': float(message.text)})
-    except ValueError:
+    if values.get('type') == 'COMPANY':
         values.update({'description': message.text})
+    else:
+        try:
+            values.update({'price': float(message.text)})
+        except ValueError:
+            bot.send_message(message.chat.id, 'I told you to use only numbers. Try again')
+            main_menu(message)
+            return False
 
     if values.get('image_way') == 'DROPBOX':
         bot.send_message(message.chat.id, 'Send here your image')
@@ -333,10 +338,14 @@ def send_image_or_link(message, values):
 
 
 def upload_image(message, values):
-    photo_id = bot.get_file(message.photo[len(message.photo) - 1].file_id).file_id
-    photo_file = bot.get_file(photo_id)
-    photo_bytes = bot.download_file(photo_file.file_path)
-    dropbox.upload_file(message, photo_bytes, bot, values)
+    try:
+        photo_id = bot.get_file(message.photo[len(message.photo) - 1].file_id).file_id
+        photo_file = bot.get_file(photo_id)
+        photo_bytes = bot.download_file(photo_file.file_path)
+        dropbox.upload_file(message, photo_bytes, bot, values)
+    except TypeError:
+        bot.send_message(message.chat.id, 'It is not an image')
+        main_menu(message)
 
 
 def add_item_with_link(message, values):
@@ -600,7 +609,7 @@ def products_catalog(callback):
         if db.is_admin(callback.from_user.id):
             markup = types.InlineKeyboardMarkup()
             add_btn = types.InlineKeyboardButton('Add item', callback_data=f'{company_id}-add product')
-            companies_btn = types.InlineKeyboardButton('Return to companies', callback_data='companies')
+            companies_btn = types.InlineKeyboardButton('Return to companies', callback_data='1-companies')
             markup.add(add_btn)
             markup.add(companies_btn)
             bot.send_message(callback.message.chat.id,

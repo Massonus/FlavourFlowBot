@@ -4,13 +4,15 @@ import pandas
 import sqlalchemy
 import main
 from dropbox import DropboxOAuth2FlowNoRedirect
-from config import APP_KEY, APP_SECRET, postgres_username, postgres_password
+import config
 
-engine = sqlalchemy.create_engine(f"postgresql+psycopg2://{postgres_username}:{postgres_password}@localhost:5432/Test")
+engine = sqlalchemy.create_engine(
+    f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_test_password}@{config.postgres_test_host}:5432"
+    f"/{config.postgres_test_database}")
 
 
 def dbx_init_token(message, photo_bytes, bot, values):
-    auth_flow = DropboxOAuth2FlowNoRedirect(APP_KEY, APP_SECRET)
+    auth_flow = DropboxOAuth2FlowNoRedirect(config.APP_KEY, config.APP_SECRET)
 
     authorize_url = auth_flow.start()
     bot.send_message(message.chat.id, "Sorry, access token is invalid. Follow next steps below")
