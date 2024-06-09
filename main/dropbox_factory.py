@@ -7,13 +7,13 @@ from dropbox import DropboxOAuth2FlowNoRedirect
 import config
 from database_factory import PaginationData
 
-# engine = sqlalchemy.create_engine(
-#     f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_test_password}@{config.postgres_test_host}:5432"
-#     f"/{config.postgres_test_database}")
-
 engine = sqlalchemy.create_engine(
-    f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_password}@{config.postgres_host}:5432"
-    f"/{config.postgres_database}")
+    f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_test_password}@{config.postgres_test_host}:5432"
+    f"/{config.postgres_test_database}")
+
+# engine = sqlalchemy.create_engine(
+#     f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_password}@{config.postgres_host}:5432"
+#     f"/{config.postgres_database}")
 
 
 def dbx_init_token(message, photo_bytes, bot, values):
