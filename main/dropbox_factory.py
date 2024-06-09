@@ -4,13 +4,20 @@ import pandas
 import sqlalchemy
 import main
 from dropbox import DropboxOAuth2FlowNoRedirect
-from config import APP_KEY, APP_SECRET, postgres_username, postgres_password
+import config
+from database_factory import PaginationData
 
-engine = sqlalchemy.create_engine(f"postgresql+psycopg2://{postgres_username}:{postgres_password}@localhost:5432/Test")
+engine = sqlalchemy.create_engine(
+    f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_test_password}@{config.postgres_test_host}:5432"
+    f"/{config.postgres_test_database}")
+
+# engine = sqlalchemy.create_engine(
+#     f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_password}@{config.postgres_host}:5432"
+#     f"/{config.postgres_database}")
 
 
 def dbx_init_token(message, photo_bytes, bot, values):
-    auth_flow = DropboxOAuth2FlowNoRedirect(APP_KEY, APP_SECRET)
+    auth_flow = DropboxOAuth2FlowNoRedirect(config.APP_KEY, config.APP_SECRET)
 
     authorize_url = auth_flow.start()
     bot.send_message(message.chat.id, "Sorry, access token is invalid. Follow next steps below")
@@ -30,17 +37,20 @@ def after_init_token(message, bot, auth_flow, photo_bytes, values):
         bot.send_message(message.chat.id, f'Error: {e}')
         return False
 
-    data = pandas.read_sql('access_token', engine)
-    index = data[data['id'] == 1].index
-    data.loc[index, 'token'] = oauth_result.access_token
-    data.to_sql('access_token', engine, if_exists='replace', index=False, index_label='id')
+    sql = (f"UPDATE public.access_token "
+           f"SET value='{oauth_result.access_token}' "
+           f"WHERE id>0 ")
+
+    db = PaginationData()
+    db.cursor.execute(sql)
+    db.conn.commit()
 
     bot.send_message(message.chat.id, "Successfully set up client! Send your image again")
     bot.register_next_step_handler(message, upload_file, photo_bytes, bot, values)
 
 
-def get_dbx(message, photo_bytes, bot, values):
-    token = pandas.read_sql('access_token', engine).at[0, "token"]
+def get_dbx(message, bot, values, photo_bytes=None):
+    token = pandas.read_sql('access_token', engine).at[0, "value"]
 
     try:
         dbx = dropbox.Dropbox(token)
@@ -51,11 +61,13 @@ def get_dbx(message, photo_bytes, bot, values):
 
 
 def upload_file(message, photo_bytes, bot, values):
-    dbx = get_dbx(message, photo_bytes, bot, values)
+    dbx = get_dbx(message, bot, values, photo_bytes)
     try:
         data = pandas.read_sql(values.get('type').lower(), engine)
         path = "/FlowImages/" + values.get('type').upper() + "/" + values.get('type') + str(max(
             data['id'].values + 1)) + ".jpg"
+
+        bot.send_message(message.chat.id, "Don't do anything and wait an answer")
 
         dbx.files_upload(photo_bytes, path)
         url = dbx.sharing_create_shared_link_with_settings(path).url.replace("www.dropbox.com",
@@ -64,3 +76,13 @@ def upload_file(message, photo_bytes, bot, values):
         main.add_item_with_dropbox_link(message, values)
     except AttributeError:
         print("Waiting...")
+
+
+def delete_file(message, bot, values):
+    path = "/FlowImages/" + values.get('type').upper() + "/" + values.get('type') + values.get('id') + ".jpg"
+
+    dbx = get_dbx(message, bot, values)
+    try:
+        dbx.files_delete_v2(path)
+    except dropbox.exceptions.ApiError as error:
+        bot.send_message(message.chat.id, f'Something is wrong {error}')
