@@ -32,7 +32,8 @@ class PaginationData:
         sql = f"""SELECT * FROM {schema}.{tables} AS o
         {wheres}
         ORDER BY o.{order}
-        OFFSET {skips_page} ROWS FETCH NEXT {skip_size} ROWS ONLY;"""
+        OFFSET {skips_page}
+        LIMIT {skip_size};"""
         self.cursor.execute(sql)
         res = self.cursor.fetchall()
         self.cursor.execute(f"""SELECT Count(*) FROM {schema}.{tables} AS o {wheres};""")
