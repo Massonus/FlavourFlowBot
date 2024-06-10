@@ -10,15 +10,17 @@ engine = sqlalchemy.create_engine(
     f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_test_password}@{config.postgres_test_host}:5432"
     f"/{config.postgres_test_database}")
 
+
 # engine = sqlalchemy.create_engine(
 #     f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_password}@{config.postgres_host}:5432"
 #     f"/{config.postgres_database}")
 
 
-class PaginationData():
+class PaginationData:
     def __init__(self):
         # self.conn = psycopg2.connect(database=f'{config.postgres_database}', user=f'{config.postgres_username}',
-        #                              password=f'{config.postgres_password}', host=f'{config.postgres_host}', port=5432)
+        #                              password=f'{config.postgres_password}', host=f'{config.postgres_host}',
+        #                              port=5432)
 
         self.conn = psycopg2.connect(database=f'{config.postgres_test_database}', user=f'{config.postgres_username}',
                                      password=f'{config.postgres_test_password}', host=f'{config.postgres_test_host}',
@@ -26,7 +28,7 @@ class PaginationData():
         self.cursor = self.conn.cursor()
 
     def data_list_for_page(self, tables, order, schema='public', page=1, skip_size=1, wheres=''):
-        skips_page = ((page - 1) * skip_size)
+        skips_page = (page - 1) * skip_size
         sql = f"""SELECT * FROM {schema}.{tables} AS o
         {wheres}
         ORDER BY o.{order}
