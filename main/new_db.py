@@ -13,7 +13,7 @@ session = Session()
 
 class Consumer(Base):
     __tablename__ = 'consumer'
-    id = Column(BigInteger, primary_key=True)
+    id = Column(Integer, primary_key=True)
     username = Column(String)
     email = Column(String)
     password = Column(String)
@@ -28,26 +28,38 @@ class Consumer(Base):
 
 class PendingUser(Base):
     __tablename__ = 'pending_users'
-    id = Column(BigInteger, primary_key=True)
+    id = Column(Integer, primary_key=True)
     telegram_id = Column(BigInteger)
     user_id = Column(BigInteger, ForeignKey('consumer.id'))
+
+    @staticmethod
+    def get_user_by_telegram_id(telegram_id):
+        return session.query(PendingUser).filter_by(telegram_id=telegram_id).first()
 
 
 class UserRole(Base):
     __tablename__ = 'user_role'
-    user_id = Column(BigInteger, ForeignKey('consumer.id'))
+    user_id = Column(Integer, ForeignKey('consumer.id'), primary_key=True)
     roles = Column(String)
+
+    @staticmethod
+    def get_role_by_user_id(user_id):
+        return session.query(UserRole).filter_by(user_id=user_id).first()
 
 
 class Company(Base):
     __tablename__ = 'company'
-    id = Column(BigInteger, primary_key=True)
+    id = Column(Integer, primary_key=True)
     title = Column(String)
     description = Column(String)
     image_link = Column(String)
     rating = Column(String)
-    category_id = Column(BigInteger, ForeignKey('kitchen_categories.id'))
-    country_id = Column(BigInteger, ForeignKey('company_country.id'))
+    category_id = Column(Integer, ForeignKey('kitchen_categories.id'))
+    country_id = Column(Integer, ForeignKey('company_country.id'))
+
+    @staticmethod
+    def get_company_by_id(company_id):
+        return session.query(Company).filter_by(id=company_id).first()
 
 
 class Product(Base):
@@ -57,29 +69,43 @@ class Product(Base):
     description = Column(String)
     composition = Column(String)
     image_link = Column(String)
-    product_company = Column(String)
+    product_category = Column(String)
     price = Column(Double)
     company_id = Column(BigInteger, ForeignKey('company.id'))
+
+    @staticmethod
+    def get_product_by_id(product_id):
+        return session.query(Product).filter_by(id=product_id).first()
 
 
 class Country(Base):
     __tablename__ = 'company_country'
     id = Column(BigInteger, primary_key=True)
     title = Column(String)
-    company = relationship("Company", back_populates="company_country")
+
+    @staticmethod
+    def get_country_by_id(country_id):
+        return session.query(Country).filter_by(id=country_id).first()
 
 
 class Kitchen(Base):
     __tablename__ = 'kitchen_categories'
     id = Column(BigInteger, primary_key=True)
     title = Column(String)
-    company = relationship("Company", back_populates="kitchen_categories")
+
+    @staticmethod
+    def get_kitchen_by_id(kitchen_id):
+        return session.query(Kitchen).filter_by(id=kitchen_id).first()
 
 
 class Basket(Base):
     __tablename__ = 'basket'
     id = Column(BigInteger, primary_key=True)
-    company_id = Column(BigInteger, ForeignKey('consumer.id'))
+    user_id = Column(BigInteger, ForeignKey('consumer.id'))
+
+    @staticmethod
+    def get_basket_by_user_id(user_id):
+        return session.query(Basket).filter_by(user_id=user_id).first()
 
 
 class BasketObject(Base):
@@ -90,15 +116,27 @@ class BasketObject(Base):
     price = Column(Double)
     amount = Column(Integer)
     company_id = Column(BigInteger, ForeignKey('company.id'))
-    user_id = Column(BigInteger, ForeignKey('user.id'))
+    user_id = Column(BigInteger, ForeignKey('consumer.id'))
     basket_id = Column(BigInteger, ForeignKey('basket.id'))
     product_id = Column(BigInteger, ForeignKey('product.id'))
+
+    @staticmethod
+    def get_basket_object_by_user_id(user_id):
+        return session.query(BasketObject).filter_by(user_id=user_id).first()
+
+    @staticmethod
+    def get_basket_object_by_basket_id(basket_id):
+        return session.query(BasketObject).filter_by(basket_id=basket_id).first()
 
 
 class Wish(Base):
     __tablename__ = 'wishes'
     id = Column(BigInteger, primary_key=True)
-    company_id = Column(BigInteger, ForeignKey('consumer.id'))
+    user_id = Column(BigInteger, ForeignKey('consumer.id'))
+
+    @staticmethod
+    def get_wish_by_user_id(user_id):
+        return session.query(Wish).filter_by(user_id=user_id).first()
 
 
 class WishObject(Base):
@@ -108,9 +146,17 @@ class WishObject(Base):
     image_link = Column(String)
     price = Column(Double)
     company_id = Column(BigInteger, ForeignKey('company.id'))
-    user_id = Column(BigInteger, ForeignKey('user.id'))
-    basket_id = Column(BigInteger, ForeignKey('basket.id'))
+    user_id = Column(BigInteger, ForeignKey('consumer.id'))
+    wish_id = Column(BigInteger, ForeignKey('wishes.id'))
     product_id = Column(BigInteger, ForeignKey('product.id'))
+
+    @staticmethod
+    def get_wish_object_by_user_id(user_id):
+        return session.query(BasketObject).filter_by(user_id=user_id).first()
+
+    @staticmethod
+    def get_wish_object_by_basket_id(basket_id):
+        return session.query(BasketObject).filter_by(basket_id=basket_id).first()
 
 
 class AccessToken(Base):
@@ -119,4 +165,15 @@ class AccessToken(Base):
     value = Column(String)
 
 
-print(Consumer.get_user_by_id(1).username)
+# Base.metadata.create_all(engine)
+
+# print(Company.get_company_by_id(1).title)
+# print(Consumer.get_user_by_id(1).username)
+# print(UserRole.get_role_by_user_id(1).roles)
+# print(Product.get_product_by_id(1).title)
+# print(Country.get_country_by_id(1).title)
+# print(Kitchen.get_kitchen_by_id(1).title)
+# print(Basket.get_basket_by_user_id(1).user_id)
+# print(BasketObject.get_basket_object_by_basket_id(11).title)
+# print(Wish.get_wish_by_user_id(1).user_id)
+# print(WishObject.get_wish_object_by_user_id(1).title)
