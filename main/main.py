@@ -45,10 +45,10 @@ def command_help(message):
 
     try:
         username = db.get_username_by_telegram_id(message.from_user.id)
-        db.change_consumer_telebot_id(username, 0)
+        new_db.Consumer.change_telegram_id(username, 0)
         bot.send_message(message.from_user.id, "Successfully logout")
         main_menu(message)
-    except IndexError:
+    except AttributeError:
         bot.send_message(message.from_user.id, "You are not authorized!")
         main_menu(message)
 
@@ -479,7 +479,7 @@ def login_result(message, username):
     is_correct_password = db.verify_password(username, message.text)
 
     if is_correct_username and is_correct_password:
-        db.change_consumer_telebot_id(username, message.from_user.id)
+        new_db.Consumer.change_telegram_id(username, message.from_user.id)
         bot.send_message(message.chat.id, f"Success authorization. Welcome "
                                           f"{db.get_username_by_telegram_id(message.from_user.id)}!")
         main_menu(message)

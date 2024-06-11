@@ -6,6 +6,10 @@ engine = create_engine(
     f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_test_password}@{config.postgres_test_host}:5432"
     f"/{config.postgres_test_database}")
 
+# engine = create_engine(
+#     f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_password}@{config.postgres_host}:5432"
+#     f"/{config.postgres_database}")
+
 Session = sessionmaker(bind=engine)
 Base = declarative_base()
 session = Session()
@@ -40,6 +44,12 @@ class Consumer(Base):
         else:
             return False
 
+    @staticmethod
+    def change_telegram_id(username, telegram_id):
+        consumer = session.query(Consumer).filter_by(username=username).first()
+        consumer.telegram_id = telegram_id
+        session.commit()
+
 
 class PendingUser(Base):
     __tablename__ = 'pending_users'
@@ -68,7 +78,7 @@ class Company(Base):
     title = Column(String)
     description = Column(String)
     image_link = Column(String)
-    rating = Column(String)
+    rating = Column(Integer)
     category_id = Column(Integer, ForeignKey('kitchen_categories.id'))
     country_id = Column(Integer, ForeignKey('company_country.id'))
 
@@ -81,6 +91,13 @@ class Company(Base):
         skips_page = (page - 1) * skip_size
         company_count = session.query(Company).count()
         return session.query(Company).order_by(Company.title).offset(skips_page).limit(skip_size).first(), company_count
+
+    @staticmethod
+    def add_new_company(values):
+        session.add(Company(id=values.get('id'), title=values.get('title'), description=values.get('description'),
+                            image_link=values.get('image_link'), country_id=values.get('country_id'),
+                            category_id=values.get('category_id'), rating=0))
+        session.commit()
 
 
 class Product(Base):
@@ -216,7 +233,6 @@ class AccessToken(Base):
     id = Column(BigInteger, primary_key=True)
     value = Column(String)
 
-
 # Base.metadata.create_all(engine)
 
 
@@ -230,5 +246,3 @@ class AccessToken(Base):
 # print(BasketObject.get_basket_object_by_basket_id(11).title)
 # print(Wish.get_wish_by_user_id(1).user_id)
 # print(WishObject.get_wish_object_by_user_id(1).title)
-
-
