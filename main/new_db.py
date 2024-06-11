@@ -433,5 +433,16 @@ class AccessToken(Base):
     id = Column(BigInteger, primary_key=True)
     value = Column(String)
 
+    @staticmethod
+    def get_token():
+        return session.query(AccessToken).first().value
+
+    @staticmethod
+    def update_token(value):
+        access_token = AccessToken.get_token()
+        session.delete(access_token)
+        session.add(AccessToken(id=1, value=value))
+        session.commit()
+
 # initialize all tables
 # Base.metadata.create_all(engine)
