@@ -49,7 +49,7 @@ class PendingUser(Base):
 
     @staticmethod
     def get_user_by_telegram_id(telegram_id):
-        return session.query(PendingUser).filter_by(telegram_id=telegram_id).first()
+        return session.query(PendingUser).filter_by(user_id=telegram_id).first()
 
 
 class UserRole(Base):
