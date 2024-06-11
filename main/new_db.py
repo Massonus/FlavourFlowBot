@@ -393,6 +393,40 @@ class WishObject(Base):
     def get_wish_object_by_basket_id(basket_id):
         return session.query(BasketObject).filter_by(basket_id=basket_id).first()
 
+    @staticmethod
+    def get_max_id():
+        return session.query(func.max(WishObject.id)).first()[0]
+
+    @staticmethod
+    def get_by_product_and_user_id(product_id, user_id):
+        return session.query(WishObject).where(WishObject.product_id == product_id,
+                                               WishObject.user_id == user_id).first()
+
+    @staticmethod
+    def add_new(product_id, telegram_id):
+        user_id = Consumer.get_user_by_telegram_id(telegram_id).id
+        wish_object = WishObject.get_by_product_and_user_id(product_id, user_id)
+
+        if wish_object is not None:
+            session.delete(wish_object)
+            session.commit()
+            return f"Deleted from wishes"
+        else:
+            product = Product.get_product_by_id(product_id)
+            values = {'id': WishObject.get_max_id() + 1,
+                      'title': product.title,
+                      'image_link': product.image_link,
+                      'user_id': user_id,
+                      'product_id': product_id,
+                      'company_id': product.company_id,
+                      'wish_id': Wish.get_wish_by_user_id(user_id).id,
+                      'price': product.price}
+
+            new_object = WishObject(**values)
+            session.add(new_object)
+            session.commit()
+            return "Added to wishes"
+
 
 class AccessToken(Base):
     __tablename__ = 'access_token'

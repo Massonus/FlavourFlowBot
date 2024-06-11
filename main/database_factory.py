@@ -30,36 +30,3 @@ class PsycopgDB:
                                      password=f'{config.postgres_test_password}', host=f'{config.postgres_test_host}',
                                      port=5432)
         self.cursor = self.conn.cursor()
-
-
-def add_to_wish(product_id, telegram_id, bot, message):
-    product_data = pd.read_sql('product', engine)
-    wish_object_data = pd.read_sql('wish_object', engine)
-    wish_data = pd.read_sql('wishes', engine)
-    user_id = new_db.Consumer.get_user_by_telegram_id(telegram_id).id
-
-    product = product_data.loc[product_data['id'] == product_id].to_dict(orient='records')[0]
-
-    wish_id = wish_data.loc[wish_data['user_id'] == user_id, 'id'].values[0]
-
-    sql = (f"SELECT * FROM public.wish_object AS obj "
-           f"WHERE product_id = {product_id} AND user_id = {user_id}")
-    db = PsycopgDB()
-    db.cursor.execute(sql)
-    product_params = db.cursor.fetchone()
-
-    if product_params is None:
-
-        df1 = pd.DataFrame(
-            [{'title': product.get('title'), 'image_link': product.get('image_link'), 'wish_id': wish_id,
-              'user_id': user_id,
-              'product_id': product_id, 'id': max(wish_object_data['id'].values + 1),
-              'company_id': product.get('company_id'), 'price': product.get('price')}])
-        df1.to_sql('wish_object', engine, if_exists='append', index=False, index_label='id')
-        bot.send_message(message.chat.id, 'Added to your wishes')
-    else:
-        sql = (f"DELETE FROM public.wish_object "
-               f"WHERE id = {product_params[3]} ")
-        db.cursor.execute(sql)
-        db.conn.commit()
-        bot.send_message(message.chat.id, 'Deleted from wishes')

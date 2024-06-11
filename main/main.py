@@ -82,7 +82,7 @@ def callback_query(callback):
 
     elif "add-wish" in callback.data:
         product_id = int(callback.data.split('-')[0])
-        db.add_to_wish(product_id, callback.from_user.id, bot, callback.message)
+        bot.send_message(callback.message.chat.id, new_db.WishObject.add_new(product_id, callback.from_user.id))
 
     elif callback.data == "profile":
         callback.message.from_user.id = callback.from_user.id
