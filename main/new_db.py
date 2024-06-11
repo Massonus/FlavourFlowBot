@@ -55,11 +55,23 @@ class PendingUser(Base):
     __tablename__ = 'pending_users'
     id = Column(Integer, primary_key=True)
     telegram_id = Column(BigInteger)
-    user_id = Column(BigInteger, ForeignKey('consumer.id'))
 
     @staticmethod
-    def get_user_by_telegram_id(telegram_id):
-        return session.query(PendingUser).filter_by(user_id=telegram_id).first()
+    def is_pending(telegram_id):
+        result = session.query(PendingUser).filter_by(telegram_id=telegram_id).first()
+        return True if result is not None else False
+
+    @staticmethod
+    def add_pending_user(telegram_id):
+        pending = PendingUser(telegram_id=telegram_id)
+        session.add(pending)
+        session.commit()
+
+    @staticmethod
+    def delete_pending_user(telegram_id):
+        pending = session.query(PendingUser).filter_by(telegram_id=telegram_id).first()
+        session.delete(pending)
+        session.commit()
 
 
 class UserRole(Base):
@@ -233,8 +245,7 @@ class AccessToken(Base):
     id = Column(BigInteger, primary_key=True)
     value = Column(String)
 
-# Base.metadata.create_all(engine)
-
+Base.metadata.create_all(engine)
 
 # print(Company.get_company_by_id(1).title)
 # print(Consumer.get_user_by_id(1).username)

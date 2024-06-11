@@ -31,16 +31,6 @@ class PsycopgDB:
         self.cursor = self.conn.cursor()
 
 
-def get_pending_users():
-    try:
-        data = pd.read_sql('pending_users', engine)
-    except exc.ProgrammingError:
-        data = pd.DataFrame(columns=['user_id'])
-        data.to_sql('pending_users', engine, if_exists='append', index=False, index_label='id')
-    pending_users = data['user_id'].values.tolist()
-    return pending_users
-
-
 def get_consumers_usernames():
     data = pd.read_sql('consumer', engine)
     return data['username'].values.tolist()
@@ -208,11 +198,6 @@ def change_consumer_telebot_id(username, user_id):
     db.conn.commit()
 
 
-def add_pending_user(user_id):
-    data = pd.DataFrame([{'user_id': user_id}])
-    data.to_sql('pending_users', engine, if_exists='append', index=False, index_label='id')
-
-
 def add_new_consumer(username, email, password, telegram_id):
     consumer_data = pd.read_sql('consumer', engine)
     user_id = max(consumer_data['id'].values + 1)
@@ -243,10 +228,3 @@ def add_new_item(values):
     values.pop('image_way')
     df1 = pd.DataFrame([values])
     df1.to_sql(item_type, engine, if_exists='append', index=False, index_label='id')
-
-
-def delete_pending_user(user_id):
-    data = pd.read_sql('pending_users', engine)
-    index = data[data['user_id'] == user_id].index
-    data = data.drop(index)
-    data.to_sql('pending_users', engine, if_exists='replace', index=False, index_label='id')

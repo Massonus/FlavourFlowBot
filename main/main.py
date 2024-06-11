@@ -113,7 +113,7 @@ def callback_query(callback):
 
     elif callback.data == "help":
 
-        if str(callback.from_user.id) not in db.get_pending_users():
+        if not new_db.PendingUser.is_pending(callback.from_user.id):
             bot.send_message(callback.message.chat.id, 'Enter your question')
             bot.register_next_step_handler(callback.message, send_question_to_support_group, callback.from_user.id)
         else:
@@ -391,7 +391,7 @@ def main_menu(message):
 def send_question_to_support_group(message, user_id):
     bot.reply_to(message, "Your question was sent")
     main_menu(message)
-    db.add_pending_user(user_id)
+    new_db.PendingUser.add_pending_user(user_id)
     markup = types.InlineKeyboardMarkup()
     btn1 = types.InlineKeyboardButton('💬 Answer',
                                       callback_data=f'{message.chat.id}-{message.from_user.id}-{message.message_id}'
@@ -493,7 +493,7 @@ def send_answer(message, chat_id, message_id, user_id, question_message_id):
     bot.send_message(chat_id, f'Your have got an answer: \n<b>{message.text}</b>', parse_mode='HTML',
                      reply_to_message_id=question_message_id)
     bot.reply_to(message, 'Your answer was sent')
-    db.delete_pending_user(user_id)
+    new_db.PendingUser.delete_pending_user(user_id)
     bot.delete_message(GROUP_ID, message_id)
 
 
@@ -515,7 +515,7 @@ def ignore_message(callback):
     message_id = callback.message.message_id
     bot.send_message(chat_id, "Unfortunately, your question was denied", reply_to_message_id=question_message_id)
     bot.delete_message(GROUP_ID, message_id)
-    db.delete_pending_user(user_id)
+    new_db.PendingUser.delete_pending_user(user_id)
 
 
 def companies_catalog(callback):
