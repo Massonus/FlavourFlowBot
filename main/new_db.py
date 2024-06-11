@@ -2,6 +2,7 @@ from sqlalchemy import create_engine, Column, Integer, BigInteger, Double, Forei
 from sqlalchemy.orm import sessionmaker, relationship, declarative_base
 from passlib.hash import bcrypt
 import config
+import dropbox_factory as dropbox
 
 engine = create_engine(
     f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_test_password}@{config.postgres_test_host}:5432"
@@ -161,6 +162,21 @@ class Company(Base):
                             category_id=values.get('category_id'), rating=0))
         session.commit()
 
+    @staticmethod
+    def delete(message, bot, company_id):
+        company = session.query(Company).filter_by(id=company_id).first()
+        image_link = company.image_link
+
+        products = Product.get_products_by_company_id(company_id)
+        for product in products:
+            Product.delete(message, bot, product.id)
+
+        if "dropbox" in image_link:
+            values = {'type': 'company', 'id': str(company_id)}
+            dropbox.delete_file(message, bot, values)
+        session.delete(company)
+        session.commit()
+
 
 class Product(Base):
     __tablename__ = 'product'
@@ -183,6 +199,20 @@ class Product(Base):
         product_count = session.query(Product).where(Product.company_id == company_id).count()
         return session.query(Product).where(Product.company_id == company_id).order_by(Product.title).offset(
             skips_page).limit(skip_size).first(), product_count
+
+    @staticmethod
+    def get_products_by_company_id(company_id):
+        return session.query(Product).filter_by(company_id=company_id).all()
+
+    @staticmethod
+    def delete(message, bot, product_id):
+        product = session.query(Product).filter_by(id=product_id).first()
+        image_link = product.image_link
+        if "dropbox" in image_link:
+            values = {'type': 'product', 'id': str(product_id)}
+            dropbox.delete_file(message, bot, values)
+        session.delete(product)
+        session.commit()
 
 
 class Country(Base):

@@ -242,14 +242,14 @@ def confirm_delete_company(message, company_id):
 
 def delete_product(message, product_id):
     bot.delete_message(message.chat.id, message.message_id)
-    db.delete_product(message, bot, product_id)
+    new_db.Product.delete(message, bot, product_id)
     bot.send_message(message.chat.id, 'Deleted successfully')
     main_menu(message)
 
 
 def delete_company(message, company_id):
     bot.delete_message(message.chat.id, message.message_id)
-    db.delete_company(message, bot, company_id)
+    new_db.Company.delete(message, bot, company_id)
     bot.send_message(message.chat.id, 'Deleted successfully')
     main_menu(message)
 
