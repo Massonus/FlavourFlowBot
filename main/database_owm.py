@@ -1,4 +1,5 @@
-from sqlalchemy import create_engine, Column, Integer, BigInteger, Double, ForeignKey, String, DateTime, func
+from sqlalchemy import create_engine, Column, Integer, BigInteger, Double, ForeignKey, String, DateTime, func, Date, \
+    Time
 from sqlalchemy.orm import sessionmaker, declarative_base
 from passlib.hash import bcrypt
 import config
@@ -262,8 +263,8 @@ class Order(Base):
     __tablename__ = 'orders'
     id = Column(BigInteger, primary_key=True)
     total = Column(Double)
-    date = Column(DateTime)
-    time = Column(DateTime)
+    date = Column(Date)
+    time = Column(Time)
     earned_bonuses = Column(Double)
     address = Column(String)
     user_id = Column(BigInteger, ForeignKey('consumer.id'))
@@ -317,7 +318,8 @@ class BasketObject(Base):
 
     @staticmethod
     def get_max_id():
-        return session.query(func.max(BasketObject.id)).first()[0]
+        result = session.query(func.max(BasketObject.id)).first()[0]
+        return result if result is not None else 0
 
     @staticmethod
     def add_new(product_id, telegram_id):
