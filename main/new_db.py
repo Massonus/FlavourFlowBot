@@ -23,7 +23,22 @@ class Consumer(Base):
 
     @staticmethod
     def get_user_by_id(user_id):
-        return session.query(Consumer).filter_by(id=user_id).first()
+        result = session.query(Consumer).filter_by(id=user_id).first()
+        return result if result is not None else Consumer(username="Unauthorized")
+
+    @staticmethod
+    def is_authenticated(telegram_id):
+        result = session.query(Consumer).filter_by(telegram_id=telegram_id).first()
+        return True if result is not None else False
+
+    @staticmethod
+    def is_admin(telegram_id):
+        if Consumer.is_authenticated(telegram_id):
+            result = session.query(Consumer).filter_by(telegram_id=telegram_id).first()
+            role = session.query(UserRole).filter_by(user_id=result.id).first()
+            return True if role.roles == "ADMIN" else False
+        else:
+            return False
 
 
 class PendingUser(Base):
@@ -196,8 +211,6 @@ class AccessToken(Base):
 
 # Base.metadata.create_all(engine)
 
-company, count = Company.get_companies_for_catalog(3, 1)
-print(company.title, count)
 
 # print(Company.get_company_by_id(1).title)
 # print(Consumer.get_user_by_id(1).username)
@@ -209,3 +222,5 @@ print(company.title, count)
 # print(BasketObject.get_basket_object_by_basket_id(11).title)
 # print(Wish.get_wish_by_user_id(1).user_id)
 # print(WishObject.get_wish_object_by_user_id(1).title)
+
+print(Consumer.is_admin(661204444))

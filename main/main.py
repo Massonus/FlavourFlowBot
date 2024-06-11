@@ -19,7 +19,7 @@ def start(message):
         bot.send_message(message.chat.id, "I don't work in groups")
         return False
 
-    if db.is_authorized(message.from_user.id):
+    if new_db.Consumer.is_authenticated(message.from_user.id):
         bot.send_message(message.chat.id,
                          f"Welcome. You are authorized as "
                          f"{db.get_username_by_telegram_id(message.from_user.id)}!")
@@ -365,13 +365,13 @@ def add_item_with_dropbox_link(message, values):
 def main_menu(message):
     markup = types.InlineKeyboardMarkup()
 
-    if db.is_authorized(message.from_user.id):
+    if new_db.Consumer.is_authenticated(message.from_user.id):
         profile_btn = types.InlineKeyboardButton('🎗️ Profile', callback_data='profile')
         orders_btn = types.InlineKeyboardButton('🧾 Orders', callback_data='orders')
         markup.add(profile_btn)
         markup.add(orders_btn)
 
-    elif message.from_user.id not in db.get_authorization_users():
+    elif not new_db.Consumer.is_authenticated(message.from_user.id):
         login_btn = types.InlineKeyboardButton('👤 Login', callback_data='login')
         register_btn = types.InlineKeyboardButton('🆕 Registration', callback_data='register')
         markup.row(login_btn, register_btn)
@@ -530,7 +530,7 @@ def companies_catalog(callback):
     markup.add(
         types.InlineKeyboardButton(text='Products of this company', callback_data=f"1-{company.id}-{page}-products"))
 
-    if db.is_admin(callback.from_user.id):
+    if new_db.Consumer.is_admin(callback.from_user.id):
         add_btn = types.InlineKeyboardButton('Add item', callback_data='add company')
         delete_btn = types.InlineKeyboardButton('Delete item', callback_data=f'{company.id}-delete-company')
 
@@ -569,14 +569,14 @@ def products_catalog(callback):
         markup.add(types.InlineKeyboardButton(text='Return to main menu', callback_data='main menu'))
         markup.add(types.InlineKeyboardButton(text='Bask to companies', callback_data=f"{company_page}-companies"))
 
-        if db.is_admin(callback.from_user.id):
+        if new_db.Consumer.is_admin(callback.from_user.id):
             add_btn = types.InlineKeyboardButton('Add item', callback_data=f'{company_id}-add product')
             delete_btn = types.InlineKeyboardButton('Delete item', callback_data=f'{product.id}-delete-product')
 
             markup.add(add_btn)
             markup.add(delete_btn)
 
-        if db.is_authorized(callback.from_user.id):
+        if new_db.Consumer.is_authenticated(callback.from_user.id):
             add_to_basket = types.InlineKeyboardButton('Add to basket', callback_data=f'{product.id}-add-basket')
             add_to_wishlist = types.InlineKeyboardButton('Add to wishlist', callback_data=f'{product.id}-add-wish')
             markup.row(add_to_basket, add_to_wishlist)
@@ -607,7 +607,7 @@ def products_catalog(callback):
                                                                                    f'<i>{product.composition}</i>\n',
                        parse_mode="HTML", reply_markup=markup)
     except AttributeError:
-        if db.is_admin(callback.from_user.id):
+        if new_db.Consumer.is_admin(callback.from_user.id):
             markup = types.InlineKeyboardMarkup()
             add_btn = types.InlineKeyboardButton('Add item', callback_data=f'{company_id}-add product')
             companies_btn = types.InlineKeyboardButton('Return to companies', callback_data='1-companies')

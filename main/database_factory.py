@@ -31,32 +31,6 @@ class PsycopgDB:
         self.cursor = self.conn.cursor()
 
 
-def is_authorized(telegram_id):
-    return telegram_id in get_authorization_users()
-
-
-def is_admin(telegram_id):
-    data_consumer = pd.read_sql('consumer', engine)
-    data_user_role = pd.read_sql('user_role', engine)
-    try:
-        user_id = data_consumer.loc[data_consumer['telegram_id'] == telegram_id, 'id'].values[0]
-        admins_id = data_user_role.loc[data_user_role['roles'] == "ADMIN", 'user_id'].values.tolist()
-    except IndexError:
-        return False
-    return user_id in admins_id
-
-
-def get_authorization_users():
-    data = pd.read_sql('consumer', engine)
-    users = []
-    try:
-        users = data['telegram_id'].values.tolist()
-    except KeyError:
-        data['telegram_id'] = [0] * len(data)
-        data.to_sql('consumer', engine, index=False, index_label='id')
-    return users
-
-
 def get_categories():
     df = pd.read_sql('kitchen_categories', engine)
     return pd.Series(df.title.values, index=df.id).to_dict()
@@ -264,6 +238,8 @@ def add_new_consumer(username, email, password, telegram_id):
     wish_id = max(wish_data['id'].values + 1)
     basket_data = pd.DataFrame([{'id': basket_id, 'user_id': user_id}])
     wish_data = pd.DataFrame([{'id': wish_id, 'user_id': user_id}])
+    user_role_data = pd.DataFrame([{'user_id': user_id, 'roles': "USER"}])
+    user_role_data.to_sql('user_role', engine, if_exists='append', index=False, index_label='id')
     basket_data.to_sql('basket', engine, if_exists='append', index=False, index_label='id')
     wish_data.to_sql('wishes', engine, if_exists='append', index=False, index_label='id')
 
