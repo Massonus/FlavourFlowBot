@@ -30,19 +30,6 @@ class PsycopgDB:
                                      port=5432)
         self.cursor = self.conn.cursor()
 
-    def data_list_for_page(self, tables, order, schema='public', page=1, skip_size=1, wheres=''):
-        skips_page = (page - 1) * skip_size
-        sql = f"""SELECT * FROM {schema}.{tables} AS o
-        {wheres}
-        ORDER BY o.{order}
-        OFFSET {skips_page}
-        LIMIT {skip_size};"""
-        self.cursor.execute(sql)
-        res = self.cursor.fetchall()
-        self.cursor.execute(f"""SELECT Count(*) FROM {schema}.{tables} AS o {wheres};""")
-        count = self.cursor.fetchone()[0]
-        return res[0], count
-
 
 def is_authorized(telegram_id):
     return telegram_id in get_authorization_users()

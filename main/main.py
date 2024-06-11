@@ -1,5 +1,6 @@
 import re
 import telebot
+import new_db
 import dropbox_factory as dropbox
 import database_factory as db
 from config import GROUP_ID, TG_TOKEN
@@ -521,18 +522,17 @@ def companies_catalog(callback):
     page = int(callback.data.split('-')[0])
 
     # Number of rows and data for 1 page
-    data, count = pagination.data_list_for_page(tables='company', order='title', page=page,
-                                                skip_size=1)  # skip_size - display by one element
+    company, count = new_db.Company.get_companies_for_catalog(page, skip_size=1)  # skip_size - display by one element
 
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton(text='Return to main menu', callback_data='main menu'))
 
     markup.add(
-        types.InlineKeyboardButton(text='Products of this company', callback_data=f"1-{data[3]}-{page}-products"))
+        types.InlineKeyboardButton(text='Products of this company', callback_data=f"1-{company.id}-{page}-products"))
 
     if db.is_admin(callback.from_user.id):
         add_btn = types.InlineKeyboardButton('Add item', callback_data='add company')
-        delete_btn = types.InlineKeyboardButton('Delete item', callback_data=f'{data[3]}-delete-company')
+        delete_btn = types.InlineKeyboardButton('Delete item', callback_data=f'{company.id}-delete-company')
 
         markup.add(add_btn)
         markup.add(delete_btn)
@@ -550,8 +550,9 @@ def companies_catalog(callback):
                    types.InlineKeyboardButton(text=f'Forward --->', callback_data=f"{page + 1}-companies"))
 
     bot.delete_message(callback.message.chat.id, callback.message.message_id)
-    bot.send_photo(callback.message.chat.id, photo=data[5], caption=f'<b>{data[6]}</b>\n\n'
-                                                                    f'<b>Description:</b> <i>{data[4]}</i>\n',
+    bot.send_photo(callback.message.chat.id, photo=company.image_link, caption=f'<b>{company.title}</b>\n\n'
+                                                                               f'<b>Description:</b> '
+                                                                               f'<i>{company.description}</i>\n',
                    parse_mode="HTML", reply_markup=markup)
 
 
@@ -562,9 +563,7 @@ def products_catalog(callback):
     company_page = int(text_split[2])
     try:
         # Number of rows and data for 1 page
-        data, count = pagination.data_list_for_page(tables='product', order='title', page=page,
-                                                    skip_size=1,  # skip_size - display by one element
-                                                    wheres=f"WHERE company_id = {company_id}")
+        product, count = new_db.Product.get_products_for_catalog(company_id, page, skip_size=1)
 
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton(text='Return to main menu', callback_data='main menu'))
@@ -572,14 +571,14 @@ def products_catalog(callback):
 
         if db.is_admin(callback.from_user.id):
             add_btn = types.InlineKeyboardButton('Add item', callback_data=f'{company_id}-add product')
-            delete_btn = types.InlineKeyboardButton('Delete item', callback_data=f'{data[2]}-delete-product')
+            delete_btn = types.InlineKeyboardButton('Delete item', callback_data=f'{product.id}-delete-product')
 
             markup.add(add_btn)
             markup.add(delete_btn)
 
         if db.is_authorized(callback.from_user.id):
-            add_to_basket = types.InlineKeyboardButton('Add to basket', callback_data=f'{data[2]}-add-basket')
-            add_to_wishlist = types.InlineKeyboardButton('Add to wishlist', callback_data=f'{data[2]}-add-wish')
+            add_to_basket = types.InlineKeyboardButton('Add to basket', callback_data=f'{product.id}-add-basket')
+            add_to_wishlist = types.InlineKeyboardButton('Add to wishlist', callback_data=f'{product.id}-add-wish')
             markup.row(add_to_basket, add_to_wishlist)
 
         if page == 1:
@@ -601,11 +600,13 @@ def products_catalog(callback):
                                            callback_data=f"{page + 1}-{company_id}-{company_page}-products"))
 
         bot.delete_message(callback.message.chat.id, callback.message.message_id)
-        bot.send_photo(callback.message.chat.id, photo=data[5], caption=f'<b>{data[7]}</b>\n\n'
-                                                                        f'<b>Description:</b> <i>{data[4]}</i>\n'
-                                                                        f'<b>Composition:</b> <i>{data[3]}</i>\n',
+        bot.send_photo(callback.message.chat.id, photo=product.image_link, caption=f'<b>{product.title}</b>\n\n'
+                                                                                   f'<b>Description:</b> '
+                                                                                   f'<i>{product.description}</i>\n'
+                                                                                   f'<b>Composition:</b> '
+                                                                                   f'<i>{product.composition}</i>\n',
                        parse_mode="HTML", reply_markup=markup)
-    except IndexError:
+    except AttributeError:
         if db.is_admin(callback.from_user.id):
             markup = types.InlineKeyboardMarkup()
             add_btn = types.InlineKeyboardButton('Add item', callback_data=f'{company_id}-add product')

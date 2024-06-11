@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, BigInteger, Double, ForeignKey, String, exc
+from sqlalchemy import create_engine, Column, Integer, BigInteger, Double, ForeignKey, String, exc, DateTime
 from sqlalchemy.orm import sessionmaker, relationship, declarative_base
 import config
 
@@ -61,6 +61,12 @@ class Company(Base):
     def get_company_by_id(company_id):
         return session.query(Company).filter_by(id=company_id).first()
 
+    @staticmethod
+    def get_companies_for_catalog(page=1, skip_size=1):
+        skips_page = (page - 1) * skip_size
+        company_count = session.query(Company).count()
+        return session.query(Company).order_by(Company.title).offset(skips_page).limit(skip_size).first(), company_count
+
 
 class Product(Base):
     __tablename__ = 'product'
@@ -77,6 +83,13 @@ class Product(Base):
     def get_product_by_id(product_id):
         return session.query(Product).filter_by(id=product_id).first()
 
+    @staticmethod
+    def get_products_for_catalog(company_id, page=1, skip_size=1):
+        skips_page = (page - 1) * skip_size
+        product_count = session.query(Product).where(Product.company_id == company_id).count()
+        return session.query(Product).where(Product.company_id == company_id).order_by(Product.title).offset(
+            skips_page).limit(skip_size).first(), product_count
+
 
 class Country(Base):
     __tablename__ = 'company_country'
@@ -92,6 +105,22 @@ class Kitchen(Base):
     __tablename__ = 'kitchen_categories'
     id = Column(BigInteger, primary_key=True)
     title = Column(String)
+
+    @staticmethod
+    def get_kitchen_by_id(kitchen_id):
+        return session.query(Kitchen).filter_by(id=kitchen_id).first()
+
+
+class Order(Base):
+    __tablename__ = 'orders'
+    id = Column(BigInteger, primary_key=True)
+    total = Column(Double)
+    date = Column(DateTime)
+    time = Column(DateTime)
+    earned_bonuses = Column(Double)
+    address = Column(String)
+    user_id = Column(BigInteger, ForeignKey('consumer.id'))
+    company_id = Column(BigInteger, ForeignKey('company.id'))
 
     @staticmethod
     def get_kitchen_by_id(kitchen_id):
@@ -166,6 +195,9 @@ class AccessToken(Base):
 
 
 # Base.metadata.create_all(engine)
+
+company, count = Company.get_companies_for_catalog(3, 1)
+print(company.title, count)
 
 # print(Company.get_company_by_id(1).title)
 # print(Consumer.get_user_by_id(1).username)
