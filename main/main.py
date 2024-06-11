@@ -269,21 +269,21 @@ def enter_product_title(message, values):
 
 def choose_kitchen_category(message, image_way):
     bot.delete_message(message.chat.id, message.message_id)
-    categories = db.get_categories()
+    categories = new_db.Kitchen.get_all()
     markup = types.InlineKeyboardMarkup()
-    for category_id, title in categories.items():
-        category_btn = types.InlineKeyboardButton(title, callback_data=f'{category_id}-{image_way}-category')
+    for category in categories:
+        category_btn = types.InlineKeyboardButton(category.title, callback_data=f'{category.id}-{image_way}-category')
         markup.add(category_btn)
     bot.send_message(message.chat.id, 'Choose company category:', reply_markup=markup)
 
 
 def choose_company_country(message, category_id, image_way):
     bot.delete_message(message.chat.id, message.message_id)
-    countries = db.get_countries()
+    countries = new_db.Country.get_all()
     markup = types.InlineKeyboardMarkup()
-    for country_id, title in countries.items():
-        category_btn = types.InlineKeyboardButton(title,
-                                                  callback_data=f'{category_id}-{country_id}-{image_way}-country')
+    for country in countries:
+        category_btn = types.InlineKeyboardButton(country.title,
+                                                  callback_data=f'{category_id}-{country.id}-{image_way}-country')
         markup.add(category_btn)
     bot.send_message(message.chat.id, 'Choose company category:', reply_markup=markup)
 

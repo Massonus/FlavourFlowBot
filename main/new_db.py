@@ -115,6 +115,10 @@ class Country(Base):
     def get_country_by_id(country_id):
         return session.query(Country).filter_by(id=country_id).first()
 
+    @staticmethod
+    def get_all():
+        return session.query(Country).all()
+
 
 class Kitchen(Base):
     __tablename__ = 'kitchen_categories'
@@ -124,6 +128,10 @@ class Kitchen(Base):
     @staticmethod
     def get_kitchen_by_id(kitchen_id):
         return session.query(Kitchen).filter_by(id=kitchen_id).first()
+
+    @staticmethod
+    def get_all():
+        return session.query(Kitchen).all()
 
 
 class Order(Base):
@@ -223,4 +231,4 @@ class AccessToken(Base):
 # print(Wish.get_wish_by_user_id(1).user_id)
 # print(WishObject.get_wish_object_by_user_id(1).title)
 
-print(Consumer.is_admin(661204444))
+
