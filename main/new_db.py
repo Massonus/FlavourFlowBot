@@ -318,6 +318,41 @@ class BasketObject(Base):
     def get_basket_object_by_basket_id(basket_id):
         return session.query(BasketObject).filter_by(basket_id=basket_id).first()
 
+    @staticmethod
+    def get_by_product_and_user_id(product_id, user_id):
+        return session.query(BasketObject).where(BasketObject.product_id == product_id,
+                                                 BasketObject.user_id == user_id).first()
+
+    @staticmethod
+    def get_max_id():
+        return session.query(func.max(BasketObject.id)).first()[0]
+
+    @staticmethod
+    def add_new(product_id, telegram_id):
+        user_id = Consumer.get_user_by_telegram_id(telegram_id).id
+        basket_object = BasketObject.get_by_product_and_user_id(product_id, user_id)
+
+        if basket_object is not None:
+            basket_object.amount += 1
+            session.commit()
+            return f"Changed amount {basket_object.amount}"
+        else:
+            product = Product.get_product_by_id(product_id)
+            values = {'id': BasketObject.get_max_id() + 1,
+                      'title': product.title,
+                      'image_link': product.image_link,
+                      'user_id': user_id,
+                      'product_id': product_id,
+                      'company_id': product.company_id,
+                      'basket_id': Basket.get_basket_by_user_id(user_id).id,
+                      'price': product.price,
+                      'amount': 1}
+
+            new_object = BasketObject(**values)
+            session.add(new_object)
+            session.commit()
+            return "Added to basket"
+
 
 class Wish(Base):
     __tablename__ = 'wishes'
