@@ -1,12 +1,12 @@
-import sqlalchemy
+from sqlalchemy import create_engine, Column, Integer, BigInteger, Double, ForeignKey, String, exc
+from sqlalchemy.orm import sessionmaker, relationship, declarative_base
 import psycopg2
 import pandas as pd
 import dropbox_factory as dropbox
-from sqlalchemy import exc
 import config
 from passlib.hash import bcrypt
 
-engine = sqlalchemy.create_engine(
+engine = create_engine(
     f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_test_password}@{config.postgres_test_host}:5432"
     f"/{config.postgres_test_database}")
 
@@ -14,64 +14,21 @@ engine = sqlalchemy.create_engine(
 #     f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_password}@{config.postgres_host}:5432"
 #     f"/{config.postgres_database}")
 
+Session = sessionmaker(bind=engine)
+Base = declarative_base()
+session = Session()
 
-class PaginationData():
+
+class PsycopgDB:
     def __init__(self):
         # self.conn = psycopg2.connect(database=f'{config.postgres_database}', user=f'{config.postgres_username}',
-        #                              password=f'{config.postgres_password}', host=f'{config.postgres_host}', port=5432)
+        #                              password=f'{config.postgres_password}', host=f'{config.postgres_host}',
+        #                              port=5432)
 
         self.conn = psycopg2.connect(database=f'{config.postgres_test_database}', user=f'{config.postgres_username}',
                                      password=f'{config.postgres_test_password}', host=f'{config.postgres_test_host}',
                                      port=5432)
         self.cursor = self.conn.cursor()
-
-    def data_list_for_page(self, tables, order, schema='public', page=1, skip_size=1, wheres=''):
-        skips_page = ((page - 1) * skip_size)
-        sql = f"""SELECT * FROM {schema}.{tables} AS o
-        {wheres}
-        ORDER BY o.{order}
-        OFFSET {skips_page} ROWS FETCH NEXT {skip_size} ROWS ONLY;"""
-        self.cursor.execute(sql)
-        res = self.cursor.fetchall()
-        self.cursor.execute(f"""SELECT Count(*) FROM {schema}.{tables} AS o {wheres};""")
-        count = self.cursor.fetchone()[0]
-        return res[0], count
-
-
-def is_authorized(telegram_id):
-    return telegram_id in get_authorization_users()
-
-
-def is_admin(telegram_id):
-    data_consumer = pd.read_sql('consumer', engine)
-    data_user_role = pd.read_sql('user_role', engine)
-    try:
-        user_id = data_consumer.loc[data_consumer['telegram_id'] == telegram_id, 'id'].values[0]
-        admins_id = data_user_role.loc[data_user_role['roles'] == "ADMIN", 'user_id'].values.tolist()
-    except IndexError:
-        return False
-    return user_id in admins_id
-
-
-def get_authorization_users():
-    data = pd.read_sql('consumer', engine)
-    users = []
-    try:
-        users = data['telegram_id'].values.tolist()
-    except KeyError:
-        data['telegram_id'] = [0] * len(data)
-        data.to_sql('consumer', engine, index=False, index_label='id')
-    return users
-
-
-def get_categories():
-    df = pd.read_sql('kitchen_categories', engine)
-    return pd.Series(df.title.values, index=df.id).to_dict()
-
-
-def get_countries():
-    df = pd.read_sql('company_country', engine)
-    return pd.Series(df.title.values, index=df.id).to_dict()
 
 
 def get_pending_users():
@@ -106,7 +63,7 @@ def delete_product(message, bot, product_id):
     data = pd.read_sql('product', engine)
     image_link = data.loc[data['id'] == product_id, 'image_link'].values[0]
 
-    db = PaginationData()
+    db = PsycopgDB()
     sql = f"DELETE FROM product WHERE id = {product_id}"
     db.cursor.execute(sql)
     db.conn.commit()
@@ -124,7 +81,7 @@ def delete_company(message, bot, company_id):
     data = pd.read_sql('company', engine)
     image_link = data.loc[data['id'] == company_id, 'image_link'].values[0]
 
-    db = PaginationData()
+    db = PsycopgDB()
     sql = f"DELETE FROM company WHERE id = {company_id}"
     db.cursor.execute(sql)
     db.conn.commit()
@@ -156,7 +113,7 @@ def add_to_basket(product_id, telegram_id, bot, message):
 
     sql = (f"SELECT * FROM public.basket_object AS obj "
            f"WHERE product_id = {product_id} AND user_id = {user_id}")
-    db = PaginationData()
+    db = PsycopgDB()
     db.cursor.execute(sql)
     product_params = db.cursor.fetchone()
 
@@ -191,7 +148,7 @@ def add_to_wish(product_id, telegram_id, bot, message):
 
     sql = (f"SELECT * FROM public.wish_object AS obj "
            f"WHERE product_id = {product_id} AND user_id = {user_id}")
-    db = PaginationData()
+    db = PsycopgDB()
     db.cursor.execute(sql)
     product_params = db.cursor.fetchone()
 
@@ -246,7 +203,7 @@ def change_consumer_telebot_id(username, user_id):
     sql = (f"UPDATE public.consumer "
            f"SET telegram_id={user_id} "
            f"WHERE username='{username}' ")
-    db = PaginationData()
+    db = PsycopgDB()
     db.cursor.execute(sql)
     db.conn.commit()
 
@@ -271,6 +228,8 @@ def add_new_consumer(username, email, password, telegram_id):
     wish_id = max(wish_data['id'].values + 1)
     basket_data = pd.DataFrame([{'id': basket_id, 'user_id': user_id}])
     wish_data = pd.DataFrame([{'id': wish_id, 'user_id': user_id}])
+    user_role_data = pd.DataFrame([{'user_id': user_id, 'roles': "USER"}])
+    user_role_data.to_sql('user_role', engine, if_exists='append', index=False, index_label='id')
     basket_data.to_sql('basket', engine, if_exists='append', index=False, index_label='id')
     wish_data.to_sql('wishes', engine, if_exists='append', index=False, index_label='id')
 

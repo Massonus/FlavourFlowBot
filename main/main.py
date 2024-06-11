@@ -1,13 +1,14 @@
 import re
 import telebot
+import new_db
 import dropbox_factory as dropbox
 import database_factory as db
 from config import GROUP_ID, TG_TOKEN
-from database_factory import PaginationData
+from database_factory import PsycopgDB
 
 from telebot import types
 
-pagination = PaginationData()
+pagination = PsycopgDB()
 
 bot = telebot.TeleBot(TG_TOKEN)
 
@@ -18,7 +19,7 @@ def start(message):
         bot.send_message(message.chat.id, "I don't work in groups")
         return False
 
-    if db.is_authorized(message.from_user.id):
+    if new_db.Consumer.is_authenticated(message.from_user.id):
         bot.send_message(message.chat.id,
                          f"Welcome. You are authorized as "
                          f"{db.get_username_by_telegram_id(message.from_user.id)}!")
@@ -268,21 +269,21 @@ def enter_product_title(message, values):
 
 def choose_kitchen_category(message, image_way):
     bot.delete_message(message.chat.id, message.message_id)
-    categories = db.get_categories()
+    categories = new_db.Kitchen.get_all()
     markup = types.InlineKeyboardMarkup()
-    for category_id, title in categories.items():
-        category_btn = types.InlineKeyboardButton(title, callback_data=f'{category_id}-{image_way}-category')
+    for category in categories:
+        category_btn = types.InlineKeyboardButton(category.title, callback_data=f'{category.id}-{image_way}-category')
         markup.add(category_btn)
     bot.send_message(message.chat.id, 'Choose company category:', reply_markup=markup)
 
 
 def choose_company_country(message, category_id, image_way):
     bot.delete_message(message.chat.id, message.message_id)
-    countries = db.get_countries()
+    countries = new_db.Country.get_all()
     markup = types.InlineKeyboardMarkup()
-    for country_id, title in countries.items():
-        category_btn = types.InlineKeyboardButton(title,
-                                                  callback_data=f'{category_id}-{country_id}-{image_way}-country')
+    for country in countries:
+        category_btn = types.InlineKeyboardButton(country.title,
+                                                  callback_data=f'{category_id}-{country.id}-{image_way}-country')
         markup.add(category_btn)
     bot.send_message(message.chat.id, 'Choose company category:', reply_markup=markup)
 
@@ -364,13 +365,13 @@ def add_item_with_dropbox_link(message, values):
 def main_menu(message):
     markup = types.InlineKeyboardMarkup()
 
-    if db.is_authorized(message.from_user.id):
+    if new_db.Consumer.is_authenticated(message.from_user.id):
         profile_btn = types.InlineKeyboardButton('🎗️ Profile', callback_data='profile')
         orders_btn = types.InlineKeyboardButton('🧾 Orders', callback_data='orders')
         markup.add(profile_btn)
         markup.add(orders_btn)
 
-    elif message.from_user.id not in db.get_authorization_users():
+    elif not new_db.Consumer.is_authenticated(message.from_user.id):
         login_btn = types.InlineKeyboardButton('👤 Login', callback_data='login')
         register_btn = types.InlineKeyboardButton('🆕 Registration', callback_data='register')
         markup.row(login_btn, register_btn)
@@ -521,18 +522,17 @@ def companies_catalog(callback):
     page = int(callback.data.split('-')[0])
 
     # Number of rows and data for 1 page
-    data, count = pagination.data_list_for_page(tables='company', order='title', page=page,
-                                                skip_size=1)  # skip_size - display by one element
+    company, count = new_db.Company.get_companies_for_catalog(page, skip_size=1)  # skip_size - display by one element
 
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton(text='Return to main menu', callback_data='main menu'))
 
     markup.add(
-        types.InlineKeyboardButton(text='Products of this company', callback_data=f"1-{data[3]}-{page}-products"))
+        types.InlineKeyboardButton(text='Products of this company', callback_data=f"1-{company.id}-{page}-products"))
 
-    if db.is_admin(callback.from_user.id):
+    if new_db.Consumer.is_admin(callback.from_user.id):
         add_btn = types.InlineKeyboardButton('Add item', callback_data='add company')
-        delete_btn = types.InlineKeyboardButton('Delete item', callback_data=f'{data[3]}-delete-company')
+        delete_btn = types.InlineKeyboardButton('Delete item', callback_data=f'{company.id}-delete-company')
 
         markup.add(add_btn)
         markup.add(delete_btn)
@@ -550,8 +550,9 @@ def companies_catalog(callback):
                    types.InlineKeyboardButton(text=f'Forward --->', callback_data=f"{page + 1}-companies"))
 
     bot.delete_message(callback.message.chat.id, callback.message.message_id)
-    bot.send_photo(callback.message.chat.id, photo=data[5], caption=f'<b>{data[6]}</b>\n\n'
-                                                                    f'<b>Description:</b> <i>{data[4]}</i>\n',
+    bot.send_photo(callback.message.chat.id, photo=company.image_link, caption=f'<b>{company.title}</b>\n\n'
+                                                                               f'<b>Description:</b> '
+                                                                               f'<i>{company.description}</i>\n',
                    parse_mode="HTML", reply_markup=markup)
 
 
@@ -562,24 +563,22 @@ def products_catalog(callback):
     company_page = int(text_split[2])
     try:
         # Number of rows and data for 1 page
-        data, count = pagination.data_list_for_page(tables='product', order='title', page=page,
-                                                    skip_size=1,  # skip_size - display by one element
-                                                    wheres=f"WHERE company_id = {company_id}")
+        product, count = new_db.Product.get_products_for_catalog(company_id, page, skip_size=1)
 
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton(text='Return to main menu', callback_data='main menu'))
         markup.add(types.InlineKeyboardButton(text='Bask to companies', callback_data=f"{company_page}-companies"))
 
-        if db.is_admin(callback.from_user.id):
+        if new_db.Consumer.is_admin(callback.from_user.id):
             add_btn = types.InlineKeyboardButton('Add item', callback_data=f'{company_id}-add product')
-            delete_btn = types.InlineKeyboardButton('Delete item', callback_data=f'{data[2]}-delete-product')
+            delete_btn = types.InlineKeyboardButton('Delete item', callback_data=f'{product.id}-delete-product')
 
             markup.add(add_btn)
             markup.add(delete_btn)
 
-        if db.is_authorized(callback.from_user.id):
-            add_to_basket = types.InlineKeyboardButton('Add to basket', callback_data=f'{data[2]}-add-basket')
-            add_to_wishlist = types.InlineKeyboardButton('Add to wishlist', callback_data=f'{data[2]}-add-wish')
+        if new_db.Consumer.is_authenticated(callback.from_user.id):
+            add_to_basket = types.InlineKeyboardButton('Add to basket', callback_data=f'{product.id}-add-basket')
+            add_to_wishlist = types.InlineKeyboardButton('Add to wishlist', callback_data=f'{product.id}-add-wish')
             markup.row(add_to_basket, add_to_wishlist)
 
         if page == 1:
@@ -601,12 +600,14 @@ def products_catalog(callback):
                                            callback_data=f"{page + 1}-{company_id}-{company_page}-products"))
 
         bot.delete_message(callback.message.chat.id, callback.message.message_id)
-        bot.send_photo(callback.message.chat.id, photo=data[5], caption=f'<b>{data[7]}</b>\n\n'
-                                                                        f'<b>Description:</b> <i>{data[4]}</i>\n'
-                                                                        f'<b>Composition:</b> <i>{data[3]}</i>\n',
+        bot.send_photo(callback.message.chat.id, photo=product.image_link, caption=f'<b>{product.title}</b>\n\n'
+                                                                                   f'<b>Description:</b> '
+                                                                                   f'<i>{product.description}</i>\n'
+                                                                                   f'<b>Composition:</b> '
+                                                                                   f'<i>{product.composition}</i>\n',
                        parse_mode="HTML", reply_markup=markup)
-    except IndexError:
-        if db.is_admin(callback.from_user.id):
+    except AttributeError:
+        if new_db.Consumer.is_admin(callback.from_user.id):
             markup = types.InlineKeyboardMarkup()
             add_btn = types.InlineKeyboardButton('Add item', callback_data=f'{company_id}-add product')
             companies_btn = types.InlineKeyboardButton('Return to companies', callback_data='1-companies')

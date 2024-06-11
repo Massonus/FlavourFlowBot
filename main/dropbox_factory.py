@@ -5,11 +5,12 @@ import sqlalchemy
 import main
 from dropbox import DropboxOAuth2FlowNoRedirect
 import config
-from database_factory import PaginationData
+from database_factory import PsycopgDB
 
 engine = sqlalchemy.create_engine(
     f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_test_password}@{config.postgres_test_host}:5432"
     f"/{config.postgres_test_database}")
+
 
 # engine = sqlalchemy.create_engine(
 #     f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_password}@{config.postgres_host}:5432"
@@ -39,9 +40,9 @@ def after_init_token(message, bot, auth_flow, photo_bytes, values):
 
     sql = (f"UPDATE public.access_token "
            f"SET value='{oauth_result.access_token}' "
-           f"WHERE id>0 ")
+           f"WHERE id>0;")
 
-    db = PaginationData()
+    db = PsycopgDB()
     db.cursor.execute(sql)
     db.conn.commit()
 
@@ -62,12 +63,11 @@ def get_dbx(message, bot, values, photo_bytes=None):
 
 def upload_file(message, photo_bytes, bot, values):
     dbx = get_dbx(message, bot, values, photo_bytes)
+    bot.send_message(message.chat.id, "Don't do anything and wait an answer")
     try:
         data = pandas.read_sql(values.get('type').lower(), engine)
         path = "/FlowImages/" + values.get('type').upper() + "/" + values.get('type') + str(max(
             data['id'].values + 1)) + ".jpg"
-
-        bot.send_message(message.chat.id, "Don't do anything and wait an answer")
 
         dbx.files_upload(photo_bytes, path)
         url = dbx.sharing_create_shared_link_with_settings(path).url.replace("www.dropbox.com",
