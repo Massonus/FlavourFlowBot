@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, BigInteger, Double, ForeignKey, String, exc, DateTime
+from sqlalchemy import create_engine, Column, Integer, BigInteger, Double, ForeignKey, String, exc, DateTime, func
 from sqlalchemy.orm import sessionmaker, relationship, declarative_base
 from passlib.hash import bcrypt
 import config
@@ -77,8 +77,22 @@ class Consumer(Base):
         return True if result is not None else False
 
     @staticmethod
+    def get_max_id():
+        return session.query(func.max(Consumer.id)).first()[0]
+
+    @staticmethod
     def add_consumer(values):
+        user_id = Consumer.get_max_id() + 1
+        values.update(
+            {'password': bcrypt.hash(values.get('password')), 'bonuses': 0, 'redactor': 'telegram registration',
+             'id': user_id})
         consumer = Consumer(**values)
+        session.add(consumer)
+        session.commit()
+
+        Basket.add_new(user_id)
+        Wish.add_new(user_id)
+        UserRole.add_new(user_id)
 
 
 class PendingUser(Base):
@@ -112,6 +126,12 @@ class UserRole(Base):
     @staticmethod
     def get_role_by_user_id(user_id):
         return session.query(UserRole).filter_by(user_id=user_id).first()
+
+    @staticmethod
+    def add_new(user_id):
+        new = UserRole(user_id=user_id, roles="USER")
+        session.add(new)
+        session.commit()
 
 
 class Company(Base):
@@ -222,6 +242,16 @@ class Basket(Base):
     def get_basket_by_user_id(user_id):
         return session.query(Basket).filter_by(user_id=user_id).first()
 
+    @staticmethod
+    def get_max_id():
+        return session.query(func.max(Basket.id)).first()[0]
+
+    @staticmethod
+    def add_new(user_id):
+        basket_id = Basket.get_max_id() + 1
+        session.add(Basket(id=basket_id, user_id=user_id))
+        session.commit()
+
 
 class BasketObject(Base):
     __tablename__ = 'basket_object'
@@ -252,6 +282,16 @@ class Wish(Base):
     @staticmethod
     def get_wish_by_user_id(user_id):
         return session.query(Wish).filter_by(user_id=user_id).first()
+
+    @staticmethod
+    def get_max_id():
+        return session.query(func.max(Wish.id)).first()[0]
+
+    @staticmethod
+    def add_new(user_id):
+        wish_id = Wish.get_max_id() + 1
+        session.add(Wish(id=wish_id, user_id=user_id))
+        session.commit()
 
 
 class WishObject(Base):

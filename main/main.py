@@ -417,10 +417,11 @@ def enter_login_password(message):
 
 def enter_email(message):
     username = message.text
+    values = {'username': username}
     if not new_db.Consumer.is_username_already_exists(username) and re.search(r'^[a-zA-Z][a-zA-Z0-9_]*$',
                                                                               username) is not None:
         bot.send_message(message.chat.id, "Enter email")
-        bot.register_next_step_handler(message, enter_registration_password, username)
+        bot.register_next_step_handler(message, enter_registration_password, values)
 
     elif new_db.Consumer.is_username_already_exists(username):
         bot.send_message(message.chat.id, "This username is already in use")
@@ -432,12 +433,13 @@ def enter_email(message):
         main_menu(message)
 
 
-def enter_registration_password(message, username):
+def enter_registration_password(message, values):
     email = message.text
+    values.update({'email': email})
     if not new_db.Consumer.is_email_already_exists(email) and re.search(r'^[a-z0-9]+[._]?[a-z0-9]+@\w+[.]\w+$',
                                                                         email) is not None:
         bot.send_message(message.chat.id, "Enter password")
-        bot.register_next_step_handler(message, enter_confirm_password, username, email)
+        bot.register_next_step_handler(message, enter_confirm_password, values)
 
     elif new_db.Consumer.is_email_already_exists(email):
         bot.send_message(message.chat.id, "This email is already in use")
@@ -448,11 +450,12 @@ def enter_registration_password(message, username):
         main_menu(message)
 
 
-def enter_confirm_password(message, username, email):
+def enter_confirm_password(message, values):
     password = message.text
+    values.update({'password': password})
     if re.search(r'^(?=.*[a-zA-Z])(?=.*\d)(?=.*[\W_]).{6,15}$', password) is not None:
         bot.send_message(message.chat.id, "Confirm password")
-        bot.register_next_step_handler(message, registration_result, username, email, password)
+        bot.register_next_step_handler(message, registration_result, values)
 
     else:
         bot.send_message(message.chat.id,
@@ -461,16 +464,18 @@ def enter_confirm_password(message, username, email):
         main_menu(message)
 
 
-def registration_result(message, username, email, password):
+def registration_result(message, values):
     confirm_password = message.text
-    if password == confirm_password and not new_db.Consumer.is_username_already_exists(username):
-        db.add_new_consumer(username, email, password, message.from_user.id)
+    if values.get('password') == confirm_password and not new_db.Consumer.is_username_already_exists(
+            values.get('username')):
+        values.update({'telegram_id': message.from_user.id})
+        new_db.Consumer.add_consumer(values)
         bot.send_message(message.chat.id,
                          f"Successful registration. Welcome "
                          f"{new_db.Consumer.get_user_by_telegram_id(message.from_user.id).username}!")
         main_menu(message)
 
-    elif not password == confirm_password:
+    elif not values.get('password') == confirm_password:
         bot.send_message(message.chat.id, "Passwords are different, try again")
         main_menu(message)
 
