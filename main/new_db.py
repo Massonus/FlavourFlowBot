@@ -31,6 +31,11 @@ class Consumer(Base):
         return result if result is not None else Consumer(username="Unauthorized")
 
     @staticmethod
+    def get_user_by_telegram_id(telegram_id):
+        result = session.query(Consumer).filter_by(telegram_id=telegram_id).first()
+        return result if result is not None else Consumer(username="Unauthorized")
+
+    @staticmethod
     def is_authenticated(telegram_id):
         result = session.query(Consumer).filter_by(telegram_id=telegram_id).first()
         return True if result is not None else False
@@ -49,6 +54,16 @@ class Consumer(Base):
         consumer = session.query(Consumer).filter_by(username=username).first()
         consumer.telegram_id = telegram_id
         session.commit()
+
+    @staticmethod
+    def is_username_already_exists(username):
+        result = session.query(Consumer).filter_by(username=username).first()
+        return True if result is not None else False
+
+    @staticmethod
+    def is_email_already_exists(email):
+        result = session.query(Consumer).filter_by(email=email).first()
+        return True if result is not None else False
 
 
 class PendingUser(Base):

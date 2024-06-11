@@ -31,24 +31,6 @@ class PsycopgDB:
         self.cursor = self.conn.cursor()
 
 
-def get_consumers_usernames():
-    data = pd.read_sql('consumer', engine)
-    return data['username'].values.tolist()
-
-
-def get_consumers_emails():
-    data = pd.read_sql('consumer', engine)
-    return data['email'].values.tolist()
-
-
-def is_user_exist(username):
-    data = pd.read_sql('consumer', engine)
-    try:
-        return username == data.loc[data['username'] == username, 'username'].values[0]
-    except IndexError:
-        return False
-
-
 def delete_product(message, bot, product_id):
     data = pd.read_sql('product', engine)
     image_link = data.loc[data['id'] == product_id, 'image_link'].values[0]
@@ -78,11 +60,6 @@ def delete_company(message, bot, company_id):
     if "dropbox" in image_link:
         values = {'type': 'company', 'id': str(company_id)}
         dropbox.delete_file(message, bot, values)
-
-
-def get_profile_info(telegram_id):
-    data = pd.read_sql('consumer', engine)
-    return data.loc[data['telegram_id'] == telegram_id].to_dict(orient='records')[0]
 
 
 def get_orders_info(telegram_id):

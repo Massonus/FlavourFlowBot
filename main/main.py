@@ -198,11 +198,11 @@ def callback_query(callback):
 
 
 def print_profile_info(message):
-    user_profile = db.get_profile_info(message.from_user.id)
+    user_profile = new_db.Consumer.get_user_by_telegram_id(message.from_user.id)
     bot.send_message(message.chat.id, f'Flavour Flow user information:'
-                                      f'\nUsername: {user_profile.get('username')}'
-                                      f'\nEmail: {user_profile.get('email')}'
-                                      f'\nBonuses: {user_profile.get('bonuses')}')
+                                      f'\nUsername: {user_profile.username}'
+                                      f'\nEmail: {user_profile.email}'
+                                      f'\nBonuses: {user_profile.bonuses}')
     main_menu(message)
 
 
@@ -416,12 +416,12 @@ def enter_login_password(message):
 
 def enter_email(message):
     username = message.text
-    if username not in db.get_consumers_usernames() and re.search(r'^[a-zA-Z][a-zA-Z0-9_]*$',
-                                                                  username) is not None:
+    if not new_db.Consumer.is_username_already_exists(username) and re.search(r'^[a-zA-Z][a-zA-Z0-9_]*$',
+                                                                              username) is not None:
         bot.send_message(message.chat.id, "Enter email")
         bot.register_next_step_handler(message, enter_registration_password, username)
 
-    elif username in db.get_consumers_usernames():
+    elif new_db.Consumer.is_username_already_exists(username):
         bot.send_message(message.chat.id, "This username is already in use")
         main_menu(message)
 
@@ -433,12 +433,12 @@ def enter_email(message):
 
 def enter_registration_password(message, username):
     email = message.text
-    if email not in db.get_consumers_emails() and re.search(r'^[a-z0-9]+[._]?[a-z0-9]+@\w+[.]\w+$',
-                                                            email) is not None:
+    if not new_db.Consumer.is_email_already_exists(email) and re.search(r'^[a-z0-9]+[._]?[a-z0-9]+@\w+[.]\w+$',
+                                                                        email) is not None:
         bot.send_message(message.chat.id, "Enter password")
         bot.register_next_step_handler(message, enter_confirm_password, username, email)
 
-    elif email in db.get_consumers_emails():
+    elif new_db.Consumer.is_email_already_exists(email):
         bot.send_message(message.chat.id, "This email is already in use")
         main_menu(message)
 
@@ -462,7 +462,7 @@ def enter_confirm_password(message, username, email):
 
 def registration_result(message, username, email, password):
     confirm_password = message.text
-    if password == confirm_password and username not in db.get_consumers_usernames():
+    if password == confirm_password and not new_db.Consumer.is_username_already_exists(username):
         db.add_new_consumer(username, email, password, message.from_user.id)
         bot.send_message(message.chat.id,
                          f"Successful registration. Welcome "
@@ -475,7 +475,7 @@ def registration_result(message, username, email, password):
 
 
 def login_result(message, username):
-    is_correct_username = db.is_user_exist(username)
+    is_correct_username = new_db.Consumer.is_username_already_exists(username)
     is_correct_password = db.verify_password(username, message.text)
 
     if is_correct_username and is_correct_password:
