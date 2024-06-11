@@ -5,7 +5,7 @@ import sqlalchemy
 import main
 from dropbox import DropboxOAuth2FlowNoRedirect
 import config
-import new_db
+import database_owm as database
 
 engine = sqlalchemy.create_engine(
     f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_test_password}@{config.postgres_test_host}:5432"
@@ -38,14 +38,14 @@ def after_init_token(message, bot, auth_flow, photo_bytes, values):
         bot.send_message(message.chat.id, f'Error: {e}')
         return False
 
-    new_db.AccessToken.update_token(oauth_result.access_token)
+    database.AccessToken.update_token(oauth_result.access_token)
 
     bot.send_message(message.chat.id, "Successfully set up client! Send your image again")
     bot.register_next_step_handler(message, upload_file, photo_bytes, bot, values)
 
 
 def get_dbx(message, bot, values, photo_bytes=None):
-    token = new_db.AccessToken.get_token()
+    token = database.AccessToken.get_token()
 
     try:
         dbx = dropbox.Dropbox(token)

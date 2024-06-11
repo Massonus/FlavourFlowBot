@@ -1,6 +1,6 @@
 import re
 import telebot
-import new_db
+import database_owm as database
 import dropbox_factory as dropbox
 from config import GROUP_ID, TG_TOKEN
 from telebot import types
@@ -14,10 +14,10 @@ def start(message):
         bot.send_message(message.chat.id, "I don't work in groups")
         return False
 
-    if new_db.Consumer.is_authenticated(message.from_user.id):
+    if database.Consumer.is_authenticated(message.from_user.id):
         bot.send_message(message.chat.id,
                          f"Welcome. You are authorized as "
-                         f"{new_db.Consumer.get_user_by_telegram_id(message.from_user.id).username}!")
+                         f"{database.Consumer.get_user_by_telegram_id(message.from_user.id).username}!")
     else:
         bot.send_message(message.chat.id, "Welcome. You are not authorized! You can do it below")
 
@@ -39,8 +39,8 @@ def command_help(message):
         return False
 
     try:
-        username = new_db.Consumer.get_user_by_telegram_id(message.from_user.id).username
-        new_db.Consumer.change_telegram_id(username, 0)
+        username = database.Consumer.get_user_by_telegram_id(message.from_user.id).username
+        database.Consumer.change_telegram_id(username, 0)
         bot.send_message(message.from_user.id, "Successfully logout")
         main_menu(message)
     except AttributeError:
@@ -77,11 +77,11 @@ def callback_query(callback):
 
     elif "add-basket" in callback.data:
         product_id = int(callback.data.split('-')[0])
-        bot.send_message(callback.message.chat.id, new_db.BasketObject.add_new(product_id, callback.from_user.id))
+        bot.send_message(callback.message.chat.id, database.BasketObject.add_new(product_id, callback.from_user.id))
 
     elif "add-wish" in callback.data:
         product_id = int(callback.data.split('-')[0])
-        bot.send_message(callback.message.chat.id, new_db.WishObject.add_new(product_id, callback.from_user.id))
+        bot.send_message(callback.message.chat.id, database.WishObject.add_new(product_id, callback.from_user.id))
 
     elif callback.data == "profile":
         callback.message.from_user.id = callback.from_user.id
@@ -108,7 +108,7 @@ def callback_query(callback):
 
     elif callback.data == "help":
 
-        if not new_db.PendingUser.is_pending(callback.from_user.id):
+        if not database.PendingUser.is_pending(callback.from_user.id):
             bot.send_message(callback.message.chat.id, 'Enter your question')
             bot.register_next_step_handler(callback.message, send_question_to_support_group, callback.from_user.id)
         else:
@@ -193,7 +193,7 @@ def callback_query(callback):
 
 
 def print_profile_info(message):
-    user_profile = new_db.Consumer.get_user_by_telegram_id(message.from_user.id)
+    user_profile = database.Consumer.get_user_by_telegram_id(message.from_user.id)
     bot.send_message(message.chat.id, f'Flavour Flow user information:'
                                       f'\nUsername: {user_profile.username}'
                                       f'\nEmail: {user_profile.email}'
@@ -202,11 +202,11 @@ def print_profile_info(message):
 
 
 def print_orders_info(message):
-    user_id = new_db.Consumer.get_user_by_telegram_id(message.from_user.id).id
-    orders = new_db.Order.get_orders_by_user_id(user_id)
+    user_id = database.Consumer.get_user_by_telegram_id(message.from_user.id).id
+    orders = database.Order.get_orders_by_user_id(user_id)
     bot.send_message(message.chat.id, f'Your orders:')
     for order in orders:
-        bot.send_message(message.chat.id, f'Company: {new_db.Company.get_company_by_id(order.company_id).title}'
+        bot.send_message(message.chat.id, f'Company: {database.Company.get_company_by_id(order.company_id).title}'
                                           f'\nEarned bonuses: {order.earned_bonuses}'
                                           f'\nDate and time: {order.date}, '
                                           f'{order.time.isoformat(timespec='minutes')}'
@@ -237,14 +237,14 @@ def confirm_delete_company(message, company_id):
 
 def delete_product(message, product_id):
     bot.delete_message(message.chat.id, message.message_id)
-    new_db.Product.delete(message, bot, product_id)
+    database.Product.delete(message, bot, product_id)
     bot.send_message(message.chat.id, 'Deleted successfully')
     main_menu(message)
 
 
 def delete_company(message, company_id):
     bot.delete_message(message.chat.id, message.message_id)
-    new_db.Company.delete(message, bot, company_id)
+    database.Company.delete(message, bot, company_id)
     bot.send_message(message.chat.id, 'Deleted successfully')
     main_menu(message)
 
@@ -265,7 +265,7 @@ def enter_product_title(message, values):
 
 def choose_kitchen_category(message, image_way):
     bot.delete_message(message.chat.id, message.message_id)
-    categories = new_db.Kitchen.get_all()
+    categories = database.Kitchen.get_all()
     markup = types.InlineKeyboardMarkup()
     for category in categories:
         category_btn = types.InlineKeyboardButton(category.title, callback_data=f'{category.id}-{image_way}-category')
@@ -275,7 +275,7 @@ def choose_kitchen_category(message, image_way):
 
 def choose_company_country(message, category_id, image_way):
     bot.delete_message(message.chat.id, message.message_id)
-    countries = new_db.Country.get_all()
+    countries = database.Country.get_all()
     markup = types.InlineKeyboardMarkup()
     for country in countries:
         category_btn = types.InlineKeyboardButton(country.title,
@@ -350,7 +350,7 @@ def add_item_with_link(message, values):
     values.update({'image_link': message.text})
     values.pop('type')
     values.pop('image_way')
-    new_db.Company.add_new_company(values) if item_type == "company" else new_db.Product.add_new_product(values)
+    database.Company.add_new_company(values) if item_type == "company" else database.Product.add_new_product(values)
     bot.send_message(message.chat.id, 'Item added')
     main_menu(message)
 
@@ -359,7 +359,7 @@ def add_item_with_dropbox_link(message, values):
     item_type = values.get('type').lower()
     values.pop('type')
     values.pop('image_way')
-    new_db.Company.add_new_company(values) if item_type == "company" else new_db.Product.add_new_product(values)
+    database.Company.add_new_company(values) if item_type == "company" else database.Product.add_new_product(values)
     bot.send_message(message.chat.id, 'Item added')
     main_menu(message)
 
@@ -367,13 +367,13 @@ def add_item_with_dropbox_link(message, values):
 def main_menu(message):
     markup = types.InlineKeyboardMarkup()
 
-    if new_db.Consumer.is_authenticated(message.from_user.id):
+    if database.Consumer.is_authenticated(message.from_user.id):
         profile_btn = types.InlineKeyboardButton('🎗️ Profile', callback_data='profile')
         orders_btn = types.InlineKeyboardButton('🧾 Orders', callback_data='orders')
         markup.add(profile_btn)
         markup.add(orders_btn)
 
-    elif not new_db.Consumer.is_authenticated(message.from_user.id):
+    elif not database.Consumer.is_authenticated(message.from_user.id):
         login_btn = types.InlineKeyboardButton('👤 Login', callback_data='login')
         register_btn = types.InlineKeyboardButton('🆕 Registration', callback_data='register')
         markup.row(login_btn, register_btn)
@@ -393,7 +393,7 @@ def main_menu(message):
 def send_question_to_support_group(message, user_id):
     bot.reply_to(message, "Your question was sent")
     main_menu(message)
-    new_db.PendingUser.add_pending_user(user_id)
+    database.PendingUser.add_pending_user(user_id)
     markup = types.InlineKeyboardMarkup()
     btn1 = types.InlineKeyboardButton('💬 Answer',
                                       callback_data=f'{message.chat.id}-{message.from_user.id}-{message.message_id}'
@@ -405,7 +405,7 @@ def send_question_to_support_group(message, user_id):
     bot.send_message(GROUP_ID,
                      f"<b>New question was taken!</b>"
                      f"\n<b>From:</b> {message.from_user.first_name} (FFlow username: "
-                     f"{new_db.Consumer.get_user_by_telegram_id(message.from_user.id).username})"
+                     f"{database.Consumer.get_user_by_telegram_id(message.from_user.id).username})"
                      f"\nID: {message.chat.id}"
                      f"\n<b>Message:</b> \"{message.text}\"", reply_markup=markup, parse_mode='HTML')
 
@@ -419,12 +419,12 @@ def enter_login_password(message):
 def enter_email(message):
     username = message.text
     values = {'username': username}
-    if not new_db.Consumer.is_username_already_exists(username) and re.search(r'^[a-zA-Z][a-zA-Z0-9_]*$',
-                                                                              username) is not None:
+    if not database.Consumer.is_username_already_exists(username) and re.search(r'^[a-zA-Z][a-zA-Z0-9_]*$',
+                                                                                username) is not None:
         bot.send_message(message.chat.id, "Enter email")
         bot.register_next_step_handler(message, enter_registration_password, values)
 
-    elif new_db.Consumer.is_username_already_exists(username):
+    elif database.Consumer.is_username_already_exists(username):
         bot.send_message(message.chat.id, "This username is already in use")
         main_menu(message)
 
@@ -437,12 +437,12 @@ def enter_email(message):
 def enter_registration_password(message, values):
     email = message.text
     values.update({'email': email})
-    if not new_db.Consumer.is_email_already_exists(email) and re.search(r'^[a-z0-9]+[._]?[a-z0-9]+@\w+[.]\w+$',
-                                                                        email) is not None:
+    if not database.Consumer.is_email_already_exists(email) and re.search(r'^[a-z0-9]+[._]?[a-z0-9]+@\w+[.]\w+$',
+                                                                          email) is not None:
         bot.send_message(message.chat.id, "Enter password")
         bot.register_next_step_handler(message, enter_confirm_password, values)
 
-    elif new_db.Consumer.is_email_already_exists(email):
+    elif database.Consumer.is_email_already_exists(email):
         bot.send_message(message.chat.id, "This email is already in use")
         main_menu(message)
 
@@ -467,13 +467,13 @@ def enter_confirm_password(message, values):
 
 def registration_result(message, values):
     confirm_password = message.text
-    if values.get('password') == confirm_password and not new_db.Consumer.is_username_already_exists(
+    if values.get('password') == confirm_password and not database.Consumer.is_username_already_exists(
             values.get('username')):
         values.update({'telegram_id': message.from_user.id})
-        new_db.Consumer.add_consumer(values)
+        database.Consumer.add_consumer(values)
         bot.send_message(message.chat.id,
                          f"Successful registration. Welcome "
-                         f"{new_db.Consumer.get_user_by_telegram_id(message.from_user.id).username}!")
+                         f"{database.Consumer.get_user_by_telegram_id(message.from_user.id).username}!")
         main_menu(message)
 
     elif not values.get('password') == confirm_password:
@@ -482,13 +482,13 @@ def registration_result(message, values):
 
 
 def login_result(message, username):
-    is_correct_username = new_db.Consumer.is_username_already_exists(username)
-    is_correct_password = new_db.Consumer.verify_password(username, message.text)
+    is_correct_username = database.Consumer.is_username_already_exists(username)
+    is_correct_password = database.Consumer.verify_password(username, message.text)
 
     if is_correct_username and is_correct_password:
-        new_db.Consumer.change_telegram_id(username, message.from_user.id)
+        database.Consumer.change_telegram_id(username, message.from_user.id)
         bot.send_message(message.chat.id, f"Success authorization. Welcome "
-                                          f"{new_db.Consumer.get_user_by_telegram_id(message.from_user.id).username}!")
+                                          f"{database.Consumer.get_user_by_telegram_id(message.from_user.id).username}!")
         main_menu(message)
 
     else:
@@ -500,7 +500,7 @@ def send_answer(message, chat_id, message_id, user_id, question_message_id):
     bot.send_message(chat_id, f'Your have got an answer: \n<b>{message.text}</b>', parse_mode='HTML',
                      reply_to_message_id=question_message_id)
     bot.reply_to(message, 'Your answer was sent')
-    new_db.PendingUser.delete_pending_user(user_id)
+    database.PendingUser.delete_pending_user(user_id)
     bot.delete_message(GROUP_ID, message_id)
 
 
@@ -522,14 +522,14 @@ def ignore_message(callback):
     message_id = callback.message.message_id
     bot.send_message(chat_id, "Unfortunately, your question was denied", reply_to_message_id=question_message_id)
     bot.delete_message(GROUP_ID, message_id)
-    new_db.PendingUser.delete_pending_user(user_id)
+    database.PendingUser.delete_pending_user(user_id)
 
 
 def companies_catalog(callback):
     page = int(callback.data.split('-')[0])
 
     # Number of rows and data for 1 page
-    company, count = new_db.Company.get_companies_for_catalog(page, skip_size=1)  # skip_size - display by one element
+    company, count = database.Company.get_companies_for_catalog(page, skip_size=1)  # skip_size - display by one element
 
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton(text='Return to main menu', callback_data='main menu'))
@@ -537,7 +537,7 @@ def companies_catalog(callback):
     markup.add(
         types.InlineKeyboardButton(text='Products of this company', callback_data=f"1-{company.id}-{page}-products"))
 
-    if new_db.Consumer.is_admin(callback.from_user.id):
+    if database.Consumer.is_admin(callback.from_user.id):
         add_btn = types.InlineKeyboardButton('Add item', callback_data='add company')
         delete_btn = types.InlineKeyboardButton('Delete item', callback_data=f'{company.id}-delete-company')
 
@@ -570,20 +570,20 @@ def products_catalog(callback):
     company_page = int(text_split[2])
     try:
         # Number of rows and data for 1 page
-        product, count = new_db.Product.get_products_for_catalog(company_id, page, skip_size=1)
+        product, count = database.Product.get_products_for_catalog(company_id, page, skip_size=1)
 
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton(text='Return to main menu', callback_data='main menu'))
         markup.add(types.InlineKeyboardButton(text='Bask to companies', callback_data=f"{company_page}-companies"))
 
-        if new_db.Consumer.is_admin(callback.from_user.id):
+        if database.Consumer.is_admin(callback.from_user.id):
             add_btn = types.InlineKeyboardButton('Add item', callback_data=f'{company_id}-add product')
             delete_btn = types.InlineKeyboardButton('Delete item', callback_data=f'{product.id}-delete-product')
 
             markup.add(add_btn)
             markup.add(delete_btn)
 
-        if new_db.Consumer.is_authenticated(callback.from_user.id):
+        if database.Consumer.is_authenticated(callback.from_user.id):
             add_to_basket = types.InlineKeyboardButton('Add to basket', callback_data=f'{product.id}-add-basket')
             add_to_wishlist = types.InlineKeyboardButton('Add to wishlist', callback_data=f'{product.id}-add-wish')
             markup.row(add_to_basket, add_to_wishlist)
@@ -614,7 +614,7 @@ def products_catalog(callback):
                                                                                    f'<i>{product.composition}</i>\n',
                        parse_mode="HTML", reply_markup=markup)
     except AttributeError:
-        if new_db.Consumer.is_admin(callback.from_user.id):
+        if database.Consumer.is_admin(callback.from_user.id):
             markup = types.InlineKeyboardMarkup()
             add_btn = types.InlineKeyboardButton('Add item', callback_data=f'{company_id}-add product')
             companies_btn = types.InlineKeyboardButton('Return to companies', callback_data='1-companies')
