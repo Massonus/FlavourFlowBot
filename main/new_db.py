@@ -156,10 +156,14 @@ class Company(Base):
         return session.query(Company).order_by(Company.title).offset(skips_page).limit(skip_size).first(), company_count
 
     @staticmethod
+    def get_max_id():
+        return session.query(func.max(Company.id)).first()[0]
+
+    @staticmethod
     def add_new_company(values):
-        session.add(Company(id=values.get('id'), title=values.get('title'), description=values.get('description'),
-                            image_link=values.get('image_link'), country_id=values.get('country_id'),
-                            category_id=values.get('category_id'), rating=0))
+        company_id = Company.get_max_id() + 1
+        values.update({'rating': 0, 'id': company_id})
+        session.add(Company(**values))
         session.commit()
 
     @staticmethod
@@ -212,6 +216,17 @@ class Product(Base):
             values = {'type': 'product', 'id': str(product_id)}
             dropbox.delete_file(message, bot, values)
         session.delete(product)
+        session.commit()
+
+    @staticmethod
+    def get_max_id():
+        return session.query(func.max(Product.id)).first()[0]
+
+    @staticmethod
+    def add_new_product(values):
+        product_id = Product.get_max_id() + 1
+        values.update({'id': product_id})
+        session.add(Product(**values))
         session.commit()
 
 
@@ -349,16 +364,5 @@ class AccessToken(Base):
     id = Column(BigInteger, primary_key=True)
     value = Column(String)
 
-
-Base.metadata.create_all(engine)
-
-# print(Company.get_company_by_id(1).title)
-# print(Consumer.get_user_by_id(1).username)
-# print(UserRole.get_role_by_user_id(1).roles)
-# print(Product.get_product_by_id(1).title)
-# print(Country.get_country_by_id(1).title)
-# print(Kitchen.get_kitchen_by_id(1).title)
-# print(Basket.get_basket_by_user_id(1).user_id)
-# print(BasketObject.get_basket_object_by_basket_id(11).title)
-# print(Wish.get_wish_by_user_id(1).user_id)
-# print(WishObject.get_wish_object_by_user_id(1).title)
+# initialize all tables
+# Base.metadata.create_all(engine)

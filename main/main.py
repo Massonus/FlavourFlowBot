@@ -4,11 +4,7 @@ import new_db
 import dropbox_factory as dropbox
 import database_factory as db
 from config import GROUP_ID, TG_TOKEN
-from database_factory import PsycopgDB
-
 from telebot import types
-
-pagination = PsycopgDB()
 
 bot = telebot.TeleBot(TG_TOKEN)
 
@@ -351,14 +347,20 @@ def upload_image(message, values):
 
 
 def add_item_with_link(message, values):
+    item_type = values.get('type').lower()
     values.update({'image_link': message.text})
-    db.add_new_item(values)
+    values.pop('type')
+    values.pop('image_way')
+    new_db.Company.add_new_company(values) if item_type == "company" else new_db.Product.add_new_product(values)
     bot.send_message(message.chat.id, 'Item added')
     main_menu(message)
 
 
 def add_item_with_dropbox_link(message, values):
-    db.add_new_item(values)
+    item_type = values.get('type').lower()
+    values.pop('type')
+    values.pop('image_way')
+    new_db.Company.add_new_company(values) if item_type == "company" else new_db.Product.add_new_product(values)
     bot.send_message(message.chat.id, 'Item added')
     main_menu(message)
 

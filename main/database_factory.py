@@ -98,14 +98,3 @@ def add_to_wish(product_id, telegram_id, bot, message):
         db.cursor.execute(sql)
         db.conn.commit()
         bot.send_message(message.chat.id, 'Deleted from wishes')
-
-
-def add_new_item(values):
-    item_type = values.get('type').lower()
-    data = pd.read_sql(item_type, engine)
-    item_id = max(data['id'].values + 1)
-    values.update({'id': item_id})
-    values.pop('type')
-    values.pop('image_way')
-    df1 = pd.DataFrame([values])
-    df1.to_sql(item_type, engine, if_exists='append', index=False, index_label='id')
