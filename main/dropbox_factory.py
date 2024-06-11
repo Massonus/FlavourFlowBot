@@ -5,7 +5,7 @@ import sqlalchemy
 import main
 from dropbox import DropboxOAuth2FlowNoRedirect
 import config
-from database_factory import PaginationData
+from database_factory import PsycopgDB
 
 engine = sqlalchemy.create_engine(
     f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_test_password}@{config.postgres_test_host}:5432"
@@ -42,7 +42,7 @@ def after_init_token(message, bot, auth_flow, photo_bytes, values):
            f"SET value='{oauth_result.access_token}' "
            f"WHERE id>0;")
 
-    db = PaginationData()
+    db = PsycopgDB()
     db.cursor.execute(sql)
     db.conn.commit()
 

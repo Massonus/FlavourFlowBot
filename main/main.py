@@ -3,11 +3,11 @@ import telebot
 import dropbox_factory as dropbox
 import database_factory as db
 from config import GROUP_ID, TG_TOKEN
-from database_factory import PaginationData
+from database_factory import PsycopgDB
 
 from telebot import types
 
-pagination = PaginationData()
+pagination = PsycopgDB()
 
 bot = telebot.TeleBot(TG_TOKEN)
 
