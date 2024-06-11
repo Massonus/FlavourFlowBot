@@ -33,12 +33,12 @@ class Consumer(Base):
         return result if result is not None else Consumer(username="Unauthorized")
 
     @staticmethod
-    def get_user_by_telegram_id(telegram_id):
+    def get_by_telegram_id(telegram_id):
         result = session.query(Consumer).filter_by(telegram_id=telegram_id).first()
         return result if result is not None else Consumer(username="Unauthorized")
 
     @staticmethod
-    def get_user_by_username(username):
+    def get_by_username(username):
         result = session.query(Consumer).filter_by(username=username).first()
         return result if result is not None else Consumer(username="Unauthorized")
 
@@ -58,7 +58,7 @@ class Consumer(Base):
 
     @staticmethod
     def verify_password(username, password):
-        user = Consumer.get_user_by_username(username)
+        user = Consumer.get_by_username(username)
         return bcrypt.verify(password, user.password)
 
     @staticmethod
@@ -82,7 +82,7 @@ class Consumer(Base):
         return session.query(func.max(Consumer.id)).first()[0]
 
     @staticmethod
-    def add_consumer(values):
+    def add_new(values):
         user_id = Consumer.get_max_id() + 1
         values.update(
             {'password': bcrypt.hash(values.get('password')), 'bonuses': 0, 'redactor': 'telegram registration',
@@ -107,13 +107,13 @@ class PendingUser(Base):
         return True if result is not None else False
 
     @staticmethod
-    def add_pending_user(telegram_id):
+    def add_new_pending(telegram_id):
         pending = PendingUser(telegram_id=telegram_id)
         session.add(pending)
         session.commit()
 
     @staticmethod
-    def delete_pending_user(telegram_id):
+    def delete_pending(telegram_id):
         pending = session.query(PendingUser).filter_by(telegram_id=telegram_id).first()
         session.delete(pending)
         session.commit()
@@ -125,7 +125,7 @@ class UserRole(Base):
     roles = Column(String)
 
     @staticmethod
-    def get_role_by_user_id(user_id):
+    def get_by_user_id(user_id):
         return session.query(UserRole).filter_by(user_id=user_id).first()
 
     @staticmethod
@@ -150,7 +150,7 @@ class Company(Base):
         return session.query(Company).filter_by(id=company_id).first()
 
     @staticmethod
-    def get_companies_for_catalog(page=1, skip_size=1):
+    def get_for_catalog(page=1, skip_size=1):
         skips_page = (page - 1) * skip_size
         company_count = session.query(Company).count()
         return session.query(Company).order_by(Company.title).offset(skips_page).limit(skip_size).first(), company_count
@@ -160,7 +160,7 @@ class Company(Base):
         return session.query(func.max(Company.id)).first()[0]
 
     @staticmethod
-    def add_new_company(values):
+    def add_new(values):
         company_id = Company.get_max_id() + 1
         values.update({'rating': 0, 'id': company_id})
         session.add(Company(**values))
@@ -171,7 +171,7 @@ class Company(Base):
         company = session.query(Company).filter_by(id=company_id).first()
         image_link = company.image_link
 
-        products = Product.get_products_by_company_id(company_id)
+        products = Product.get_all_by_company_id(company_id)
         for product in products:
             Product.delete(message, bot, product.id)
 
@@ -194,18 +194,18 @@ class Product(Base):
     company_id = Column(BigInteger, ForeignKey('company.id'))
 
     @staticmethod
-    def get_product_by_id(product_id):
+    def get_by_id(product_id):
         return session.query(Product).filter_by(id=product_id).first()
 
     @staticmethod
-    def get_products_for_catalog(company_id, page=1, skip_size=1):
+    def get_for_catalog(company_id, page=1, skip_size=1):
         skips_page = (page - 1) * skip_size
         product_count = session.query(Product).where(Product.company_id == company_id).count()
         return session.query(Product).where(Product.company_id == company_id).order_by(Product.title).offset(
             skips_page).limit(skip_size).first(), product_count
 
     @staticmethod
-    def get_products_by_company_id(company_id):
+    def get_all_by_company_id(company_id):
         return session.query(Product).filter_by(company_id=company_id).all()
 
     @staticmethod
@@ -223,7 +223,7 @@ class Product(Base):
         return session.query(func.max(Product.id)).first()[0]
 
     @staticmethod
-    def add_new_product(values):
+    def add_new(values):
         product_id = Product.get_max_id() + 1
         values.update({'id': product_id})
         session.add(Product(**values))
@@ -236,7 +236,7 @@ class Country(Base):
     title = Column(String)
 
     @staticmethod
-    def get_country_by_id(country_id):
+    def get_by_id(country_id):
         return session.query(Country).filter_by(id=country_id).first()
 
     @staticmethod
@@ -250,7 +250,7 @@ class Kitchen(Base):
     title = Column(String)
 
     @staticmethod
-    def get_kitchen_by_id(kitchen_id):
+    def get_by_id(kitchen_id):
         return session.query(Kitchen).filter_by(id=kitchen_id).first()
 
     @staticmethod
@@ -270,11 +270,11 @@ class Order(Base):
     company_id = Column(BigInteger, ForeignKey('company.id'))
 
     @staticmethod
-    def get_kitchen_by_id(kitchen_id):
+    def get_by_id(kitchen_id):
         return session.query(Kitchen).filter_by(id=kitchen_id).first()
 
     @staticmethod
-    def get_orders_by_user_id(user_id):
+    def get_all_by_user_id(user_id):
         return session.query(Order).filter_by(user_id=user_id).all()
 
 
@@ -284,7 +284,7 @@ class Basket(Base):
     user_id = Column(BigInteger, ForeignKey('consumer.id'))
 
     @staticmethod
-    def get_basket_by_user_id(user_id):
+    def get_by_user_id(user_id):
         return session.query(Basket).filter_by(user_id=user_id).first()
 
     @staticmethod
@@ -311,14 +311,6 @@ class BasketObject(Base):
     product_id = Column(BigInteger, ForeignKey('product.id'))
 
     @staticmethod
-    def get_basket_object_by_user_id(user_id):
-        return session.query(BasketObject).filter_by(user_id=user_id).first()
-
-    @staticmethod
-    def get_basket_object_by_basket_id(basket_id):
-        return session.query(BasketObject).filter_by(basket_id=basket_id).first()
-
-    @staticmethod
     def get_by_product_and_user_id(product_id, user_id):
         return session.query(BasketObject).where(BasketObject.product_id == product_id,
                                                  BasketObject.user_id == user_id).first()
@@ -329,7 +321,7 @@ class BasketObject(Base):
 
     @staticmethod
     def add_new(product_id, telegram_id):
-        user_id = Consumer.get_user_by_telegram_id(telegram_id).id
+        user_id = Consumer.get_by_telegram_id(telegram_id).id
         basket_object = BasketObject.get_by_product_and_user_id(product_id, user_id)
 
         if basket_object is not None:
@@ -337,14 +329,14 @@ class BasketObject(Base):
             session.commit()
             return f"Changed amount {basket_object.amount}"
         else:
-            product = Product.get_product_by_id(product_id)
+            product = Product.get_by_id(product_id)
             values = {'id': BasketObject.get_max_id() + 1,
                       'title': product.title,
                       'image_link': product.image_link,
                       'user_id': user_id,
                       'product_id': product_id,
                       'company_id': product.company_id,
-                      'basket_id': Basket.get_basket_by_user_id(user_id).id,
+                      'basket_id': Basket.get_by_user_id(user_id).id,
                       'price': product.price,
                       'amount': 1}
 
@@ -360,7 +352,7 @@ class Wish(Base):
     user_id = Column(BigInteger, ForeignKey('consumer.id'))
 
     @staticmethod
-    def get_wish_by_user_id(user_id):
+    def get_by_user_id(user_id):
         return session.query(Wish).filter_by(user_id=user_id).first()
 
     @staticmethod
@@ -386,14 +378,6 @@ class WishObject(Base):
     product_id = Column(BigInteger, ForeignKey('product.id'))
 
     @staticmethod
-    def get_wish_object_by_user_id(user_id):
-        return session.query(BasketObject).filter_by(user_id=user_id).first()
-
-    @staticmethod
-    def get_wish_object_by_basket_id(basket_id):
-        return session.query(BasketObject).filter_by(basket_id=basket_id).first()
-
-    @staticmethod
     def get_max_id():
         return session.query(func.max(WishObject.id)).first()[0]
 
@@ -404,7 +388,7 @@ class WishObject(Base):
 
     @staticmethod
     def add_new(product_id, telegram_id):
-        user_id = Consumer.get_user_by_telegram_id(telegram_id).id
+        user_id = Consumer.get_by_telegram_id(telegram_id).id
         wish_object = WishObject.get_by_product_and_user_id(product_id, user_id)
 
         if wish_object is not None:
@@ -412,14 +396,14 @@ class WishObject(Base):
             session.commit()
             return f"Deleted from wishes"
         else:
-            product = Product.get_product_by_id(product_id)
+            product = Product.get_by_id(product_id)
             values = {'id': WishObject.get_max_id() + 1,
                       'title': product.title,
                       'image_link': product.image_link,
                       'user_id': user_id,
                       'product_id': product_id,
                       'company_id': product.company_id,
-                      'wish_id': Wish.get_wish_by_user_id(user_id).id,
+                      'wish_id': Wish.get_by_user_id(user_id).id,
                       'price': product.price}
 
             new_object = WishObject(**values)

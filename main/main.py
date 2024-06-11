@@ -17,7 +17,7 @@ def start(message):
     if database.Consumer.is_authenticated(message.from_user.id):
         bot.send_message(message.chat.id,
                          f"Welcome. You are authorized as "
-                         f"{database.Consumer.get_user_by_telegram_id(message.from_user.id).username}!")
+                         f"{database.Consumer.get_by_telegram_id(message.from_user.id).username}!")
     else:
         bot.send_message(message.chat.id, "Welcome. You are not authorized! You can do it below")
 
@@ -39,7 +39,7 @@ def command_help(message):
         return False
 
     try:
-        username = database.Consumer.get_user_by_telegram_id(message.from_user.id).username
+        username = database.Consumer.get_by_telegram_id(message.from_user.id).username
         database.Consumer.change_telegram_id(username, 0)
         bot.send_message(message.from_user.id, "Successfully logout")
         main_menu(message)
@@ -193,7 +193,7 @@ def callback_query(callback):
 
 
 def print_profile_info(message):
-    user_profile = database.Consumer.get_user_by_telegram_id(message.from_user.id)
+    user_profile = database.Consumer.get_by_telegram_id(message.from_user.id)
     bot.send_message(message.chat.id, f'Flavour Flow user information:'
                                       f'\nUsername: {user_profile.username}'
                                       f'\nEmail: {user_profile.email}'
@@ -202,8 +202,8 @@ def print_profile_info(message):
 
 
 def print_orders_info(message):
-    user_id = database.Consumer.get_user_by_telegram_id(message.from_user.id).id
-    orders = database.Order.get_orders_by_user_id(user_id)
+    user_id = database.Consumer.get_by_telegram_id(message.from_user.id).id
+    orders = database.Order.get_all_by_user_id(user_id)
     bot.send_message(message.chat.id, f'Your orders:')
     for order in orders:
         bot.send_message(message.chat.id, f'Company: {database.Company.get_company_by_id(order.company_id).title}'
@@ -350,7 +350,7 @@ def add_item_with_link(message, values):
     values.update({'image_link': message.text})
     values.pop('type')
     values.pop('image_way')
-    database.Company.add_new_company(values) if item_type == "company" else database.Product.add_new_product(values)
+    database.Company.add_new(values) if item_type == "company" else database.Product.add_new(values)
     bot.send_message(message.chat.id, 'Item added')
     main_menu(message)
 
@@ -359,7 +359,7 @@ def add_item_with_dropbox_link(message, values):
     item_type = values.get('type').lower()
     values.pop('type')
     values.pop('image_way')
-    database.Company.add_new_company(values) if item_type == "company" else database.Product.add_new_product(values)
+    database.Company.add_new(values) if item_type == "company" else database.Product.add_new(values)
     bot.send_message(message.chat.id, 'Item added')
     main_menu(message)
 
@@ -393,7 +393,7 @@ def main_menu(message):
 def send_question_to_support_group(message, user_id):
     bot.reply_to(message, "Your question was sent")
     main_menu(message)
-    database.PendingUser.add_pending_user(user_id)
+    database.PendingUser.add_new_pending(user_id)
     markup = types.InlineKeyboardMarkup()
     btn1 = types.InlineKeyboardButton('💬 Answer',
                                       callback_data=f'{message.chat.id}-{message.from_user.id}-{message.message_id}'
@@ -405,7 +405,7 @@ def send_question_to_support_group(message, user_id):
     bot.send_message(GROUP_ID,
                      f"<b>New question was taken!</b>"
                      f"\n<b>From:</b> {message.from_user.first_name} (FFlow username: "
-                     f"{database.Consumer.get_user_by_telegram_id(message.from_user.id).username})"
+                     f"{database.Consumer.get_by_telegram_id(message.from_user.id).username})"
                      f"\nID: {message.chat.id}"
                      f"\n<b>Message:</b> \"{message.text}\"", reply_markup=markup, parse_mode='HTML')
 
@@ -470,10 +470,10 @@ def registration_result(message, values):
     if values.get('password') == confirm_password and not database.Consumer.is_username_already_exists(
             values.get('username')):
         values.update({'telegram_id': message.from_user.id})
-        database.Consumer.add_consumer(values)
+        database.Consumer.add_new(values)
         bot.send_message(message.chat.id,
                          f"Successful registration. Welcome "
-                         f"{database.Consumer.get_user_by_telegram_id(message.from_user.id).username}!")
+                         f"{database.Consumer.get_by_telegram_id(message.from_user.id).username}!")
         main_menu(message)
 
     elif not values.get('password') == confirm_password:
@@ -488,7 +488,7 @@ def login_result(message, username):
     if is_correct_username and is_correct_password:
         database.Consumer.change_telegram_id(username, message.from_user.id)
         bot.send_message(message.chat.id, f"Success authorization. Welcome "
-                                          f"{database.Consumer.get_user_by_telegram_id(message.from_user.id).username}!")
+                                          f"{database.Consumer.get_by_telegram_id(message.from_user.id).username}!")
         main_menu(message)
 
     else:
@@ -500,7 +500,7 @@ def send_answer(message, chat_id, message_id, user_id, question_message_id):
     bot.send_message(chat_id, f'Your have got an answer: \n<b>{message.text}</b>', parse_mode='HTML',
                      reply_to_message_id=question_message_id)
     bot.reply_to(message, 'Your answer was sent')
-    database.PendingUser.delete_pending_user(user_id)
+    database.PendingUser.delete_pending(user_id)
     bot.delete_message(GROUP_ID, message_id)
 
 
@@ -522,14 +522,14 @@ def ignore_message(callback):
     message_id = callback.message.message_id
     bot.send_message(chat_id, "Unfortunately, your question was denied", reply_to_message_id=question_message_id)
     bot.delete_message(GROUP_ID, message_id)
-    database.PendingUser.delete_pending_user(user_id)
+    database.PendingUser.delete_pending(user_id)
 
 
 def companies_catalog(callback):
     page = int(callback.data.split('-')[0])
 
     # Number of rows and data for 1 page
-    company, count = database.Company.get_companies_for_catalog(page, skip_size=1)  # skip_size - display by one element
+    company, count = database.Company.get_for_catalog(page, skip_size=1)  # skip_size - display by one element
 
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton(text='Return to main menu', callback_data='main menu'))
@@ -570,7 +570,7 @@ def products_catalog(callback):
     company_page = int(text_split[2])
     try:
         # Number of rows and data for 1 page
-        product, count = database.Product.get_products_for_catalog(company_id, page, skip_size=1)
+        product, count = database.Product.get_for_catalog(company_id, page, skip_size=1)
 
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton(text='Return to main menu', callback_data='main menu'))
