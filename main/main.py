@@ -22,7 +22,7 @@ def start(message):
     if new_db.Consumer.is_authenticated(message.from_user.id):
         bot.send_message(message.chat.id,
                          f"Welcome. You are authorized as "
-                         f"{db.get_username_by_telegram_id(message.from_user.id)}!")
+                         f"{new_db.Consumer.get_user_by_telegram_id(message.from_user.id).username}!")
     else:
         bot.send_message(message.chat.id, "Welcome. You are not authorized! You can do it below")
 
@@ -44,7 +44,7 @@ def command_help(message):
         return False
 
     try:
-        username = db.get_username_by_telegram_id(message.from_user.id)
+        username = new_db.Consumer.get_user_by_telegram_id(message.from_user.id).username
         new_db.Consumer.change_telegram_id(username, 0)
         bot.send_message(message.from_user.id, "Successfully logout")
         main_menu(message)
@@ -207,14 +207,15 @@ def print_profile_info(message):
 
 
 def print_orders_info(message):
-    orders = db.get_orders_info(message.from_user.id)
+    user_id = new_db.Consumer.get_user_by_telegram_id(message.from_user.id).id
+    orders = new_db.Order.get_orders_by_user_id(user_id)
     bot.send_message(message.chat.id, f'Your orders:')
     for order in orders:
-        bot.send_message(message.chat.id, f'Company: {db.get_company_title_by_id(order.get('company_id'))}'
-                                          f'\nEarned bonuses: {order.get('earned_bonuses')}'
-                                          f'\nDate and time: {order.get('date').date()}, '
-                                          f'{order.get('time').isoformat(timespec='minutes')}'
-                                          f'\nAddress: {order.get('address')}')
+        bot.send_message(message.chat.id, f'Company: {new_db.Company.get_company_by_id(order.company_id).title}'
+                                          f'\nEarned bonuses: {order.earned_bonuses}'
+                                          f'\nDate and time: {order.date}, '
+                                          f'{order.time.isoformat(timespec='minutes')}'
+                                          f'\nAddress: {order.address}')
 
     main_menu(message)
 
@@ -403,7 +404,7 @@ def send_question_to_support_group(message, user_id):
     bot.send_message(GROUP_ID,
                      f"<b>New question was taken!</b>"
                      f"\n<b>From:</b> {message.from_user.first_name} (FFlow username: "
-                     f"{db.get_username_by_telegram_id(message.from_user.id)})"
+                     f"{new_db.Consumer.get_user_by_telegram_id(message.from_user.id).username})"
                      f"\nID: {message.chat.id}"
                      f"\n<b>Message:</b> \"{message.text}\"", reply_markup=markup, parse_mode='HTML')
 
@@ -466,7 +467,7 @@ def registration_result(message, username, email, password):
         db.add_new_consumer(username, email, password, message.from_user.id)
         bot.send_message(message.chat.id,
                          f"Successful registration. Welcome "
-                         f"{db.get_username_by_telegram_id(message.from_user.id)}!")
+                         f"{new_db.Consumer.get_user_by_telegram_id(message.from_user.id).username}!")
         main_menu(message)
 
     elif not password == confirm_password:
@@ -476,12 +477,12 @@ def registration_result(message, username, email, password):
 
 def login_result(message, username):
     is_correct_username = new_db.Consumer.is_username_already_exists(username)
-    is_correct_password = db.verify_password(username, message.text)
+    is_correct_password = new_db.Consumer.verify_password(username, message.text)
 
     if is_correct_username and is_correct_password:
         new_db.Consumer.change_telegram_id(username, message.from_user.id)
         bot.send_message(message.chat.id, f"Success authorization. Welcome "
-                                          f"{db.get_username_by_telegram_id(message.from_user.id)}!")
+                                          f"{new_db.Consumer.get_user_by_telegram_id(message.from_user.id).username}!")
         main_menu(message)
 
     else:

@@ -5,6 +5,7 @@ import pandas as pd
 import dropbox_factory as dropbox
 import config
 from passlib.hash import bcrypt
+import new_db
 
 engine = create_engine(
     f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_test_password}@{config.postgres_test_host}:5432"
@@ -62,17 +63,11 @@ def delete_company(message, bot, company_id):
         dropbox.delete_file(message, bot, values)
 
 
-def get_orders_info(telegram_id):
-    user_id = get_user_id_by_telegram_id(telegram_id)
-    data = pd.read_sql('orders', engine)
-    return data.loc[data['user_id'] == user_id].to_dict(orient='records')
-
-
 def add_to_basket(product_id, telegram_id, bot, message):
     product_data = pd.read_sql('product', engine)
     basket_object_data = pd.read_sql('basket_object', engine)
     basket_data = pd.read_sql('basket', engine)
-    user_id = get_user_id_by_telegram_id(telegram_id)
+    user_id = new_db.Consumer.get_user_by_telegram_id(telegram_id).id
 
     product = product_data.loc[product_data['id'] == product_id].to_dict(orient='records')[0]
 
@@ -107,7 +102,7 @@ def add_to_wish(product_id, telegram_id, bot, message):
     product_data = pd.read_sql('product', engine)
     wish_object_data = pd.read_sql('wish_object', engine)
     wish_data = pd.read_sql('wishes', engine)
-    user_id = get_user_id_by_telegram_id(telegram_id)
+    user_id = new_db.Consumer.get_user_by_telegram_id(telegram_id).id
 
     product = product_data.loc[product_data['id'] == product_id].to_dict(orient='records')[0]
 
@@ -134,45 +129,6 @@ def add_to_wish(product_id, telegram_id, bot, message):
         db.cursor.execute(sql)
         db.conn.commit()
         bot.send_message(message.chat.id, 'Deleted from wishes')
-
-
-def get_username_by_telegram_id(user_id):
-    data = pd.read_sql('consumer', engine)
-    try:
-        return data.loc[data['telegram_id'] == user_id, 'username'].values[0]
-    except IndexError:
-        return "Unauthorized"
-
-
-def get_company_title_by_id(company_id):
-    data = pd.read_sql('company', engine)
-    return data.loc[data['id'] == company_id, 'title'].values[0]
-
-
-def get_user_id_by_telegram_id(user_id):
-    data = pd.read_sql('consumer', engine)
-    try:
-        return data.loc[data['telegram_id'] == user_id, 'id'].values[0]
-    except IndexError:
-        return "Unauthorized"
-
-
-def verify_password(username, password):
-    data = pd.read_sql('consumer', engine)
-    try:
-        db_password = data.loc[data['username'] == username, 'password'].values[0]
-        return bcrypt.verify(password, db_password)
-    except IndexError:
-        return "incorrect", False
-
-
-def change_consumer_telebot_id(username, user_id):
-    sql = (f"UPDATE public.consumer "
-           f"SET telegram_id={user_id} "
-           f"WHERE username='{username}' ")
-    db = PsycopgDB()
-    db.cursor.execute(sql)
-    db.conn.commit()
 
 
 def add_new_consumer(username, email, password, telegram_id):

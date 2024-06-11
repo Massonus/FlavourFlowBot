@@ -1,5 +1,6 @@
 from sqlalchemy import create_engine, Column, Integer, BigInteger, Double, ForeignKey, String, exc, DateTime
 from sqlalchemy.orm import sessionmaker, relationship, declarative_base
+from passlib.hash import bcrypt
 import config
 
 engine = create_engine(
@@ -36,6 +37,11 @@ class Consumer(Base):
         return result if result is not None else Consumer(username="Unauthorized")
 
     @staticmethod
+    def get_user_by_username(username):
+        result = session.query(Consumer).filter_by(username=username).first()
+        return result if result is not None else Consumer(username="Unauthorized")
+
+    @staticmethod
     def is_authenticated(telegram_id):
         result = session.query(Consumer).filter_by(telegram_id=telegram_id).first()
         return True if result is not None else False
@@ -48,6 +54,11 @@ class Consumer(Base):
             return True if role.roles == "ADMIN" else False
         else:
             return False
+
+    @staticmethod
+    def verify_password(username, password):
+        user = Consumer.get_user_by_username(username)
+        return bcrypt.verify(password, user.password)
 
     @staticmethod
     def change_telegram_id(username, telegram_id):
@@ -64,6 +75,10 @@ class Consumer(Base):
     def is_email_already_exists(email):
         result = session.query(Consumer).filter_by(email=email).first()
         return True if result is not None else False
+
+    @staticmethod
+    def add_consumer(values):
+        consumer = Consumer(**values)
 
 
 class PendingUser(Base):
@@ -193,6 +208,10 @@ class Order(Base):
     def get_kitchen_by_id(kitchen_id):
         return session.query(Kitchen).filter_by(id=kitchen_id).first()
 
+    @staticmethod
+    def get_orders_by_user_id(user_id):
+        return session.query(Order).filter_by(user_id=user_id).all()
+
 
 class Basket(Base):
     __tablename__ = 'basket'
@@ -259,6 +278,7 @@ class AccessToken(Base):
     __tablename__ = 'access_token'
     id = Column(BigInteger, primary_key=True)
     value = Column(String)
+
 
 Base.metadata.create_all(engine)
 
