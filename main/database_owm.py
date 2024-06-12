@@ -7,7 +7,7 @@ import dropbox_factory as dropbox
 
 engine = create_engine(
     f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_test_password}@{config.postgres_test_host}:5432"
-    f"/{config.postgres_test_database}")
+    f"/{config.postgres_practice_database}")
 
 # engine = create_engine(
 #     f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_password}@{config.postgres_host}:5432"
@@ -25,7 +25,7 @@ class AccessToken(Base):
 
     @staticmethod
     def get_token():
-        return session.query(AccessToken).first().value
+        return session.query(AccessToken).first()
 
     @staticmethod
     def update_token(value):
@@ -232,7 +232,7 @@ class Kitchen(Base):
 
 class Company(Base):
     __tablename__ = 'company'
-    id = Column(Integer, primary_key=True)
+    id = Column(BigInteger, primary_key=True)
     title = Column(String(255))
     description = Column(String(255))
     image_link = Column(String(255))
@@ -349,9 +349,9 @@ class MessageLike(Base):
 
 
 class CompanyMessage(Base):
-    __tablename__ = 'company_messages'
+    __tablename__ = 'company_message'
     company_id = Column(BigInteger, ForeignKey('company.id'), primary_key=True)
-    messages_id = Column(BigInteger, ForeignKey('message.id'), primary_key=True)
+    message_id = Column(BigInteger, ForeignKey('message.id'), primary_key=True)
 
 
 class Consumer(Base):
@@ -473,4 +473,5 @@ class UserRole(Base):
 
 
 # initialize all tables
-Base.metadata.create_all(engine)
+if __name__ == '__main__':
+    Base.metadata.create_all(engine)

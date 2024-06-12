@@ -45,7 +45,7 @@ def after_init_token(message, bot, auth_flow, photo_bytes, values):
 
 
 def get_dbx(message, bot, values, photo_bytes=None):
-    token = database.AccessToken.get_token()
+    token = database.AccessToken.get_token().value
 
     try:
         dbx = dropbox.Dropbox(token)
