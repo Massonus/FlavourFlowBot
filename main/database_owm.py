@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, BigInteger, Double, ForeignKey, String, DateTime, func, Date, \
+from sqlalchemy import create_engine, Column, Integer, BigInteger, Double, Text, ForeignKey, String, func, Date, \
     Time
 from sqlalchemy.orm import sessionmaker, declarative_base
 from passlib.hash import bcrypt
@@ -20,11 +20,11 @@ session = Session()
 
 class Consumer(Base):
     __tablename__ = 'consumer'
-    id = Column(Integer, primary_key=True)
-    username = Column(String)
-    email = Column(String)
-    password = Column(String)
-    redactor = Column(String)
+    id = Column(BigInteger, primary_key=True)
+    username = Column(String(255))
+    email = Column(String(255))
+    password = Column(String(255))
+    redactor = Column(String(255))
     bonuses = Column(Double)
     telegram_id = Column(BigInteger)
 
@@ -122,8 +122,8 @@ class PendingUser(Base):
 
 class UserRole(Base):
     __tablename__ = 'user_role'
-    user_id = Column(Integer, ForeignKey('consumer.id'), primary_key=True)
-    roles = Column(String)
+    user_id = Column(BigInteger, ForeignKey('consumer.id'), primary_key=True)
+    roles = Column(String(255))
 
     @staticmethod
     def get_by_user_id(user_id):
@@ -139,12 +139,12 @@ class UserRole(Base):
 class Company(Base):
     __tablename__ = 'company'
     id = Column(Integer, primary_key=True)
-    title = Column(String)
-    description = Column(String)
-    image_link = Column(String)
+    title = Column(String(255))
+    description = Column(String(255))
+    image_link = Column(String(255))
     rating = Column(Integer)
-    category_id = Column(Integer, ForeignKey('kitchen_categories.id'))
-    country_id = Column(Integer, ForeignKey('company_country.id'))
+    category_id = Column(BigInteger, ForeignKey('kitchen_categories.id'))
+    country_id = Column(BigInteger, ForeignKey('company_country.id'))
 
     @staticmethod
     def get_company_by_id(company_id):
@@ -186,11 +186,11 @@ class Company(Base):
 class Product(Base):
     __tablename__ = 'product'
     id = Column(BigInteger, primary_key=True)
-    title = Column(String)
-    description = Column(String)
-    composition = Column(String)
-    image_link = Column(String)
-    product_category = Column(String)
+    title = Column(String(255))
+    description = Column(String(255))
+    composition = Column(String(255))
+    image_link = Column(String(255))
+    product_category = Column(Text)
     price = Column(Double)
     company_id = Column(BigInteger, ForeignKey('company.id'))
 
@@ -234,7 +234,7 @@ class Product(Base):
 class Country(Base):
     __tablename__ = 'company_country'
     id = Column(BigInteger, primary_key=True)
-    title = Column(String)
+    title = Column(String(255))
 
     @staticmethod
     def get_by_id(country_id):
@@ -248,7 +248,7 @@ class Country(Base):
 class Kitchen(Base):
     __tablename__ = 'kitchen_categories'
     id = Column(BigInteger, primary_key=True)
-    title = Column(String)
+    title = Column(String(255))
 
     @staticmethod
     def get_by_id(kitchen_id):
@@ -266,7 +266,7 @@ class Order(Base):
     date = Column(Date)
     time = Column(Time)
     earned_bonuses = Column(Double)
-    address = Column(String)
+    address = Column(String(255))
     user_id = Column(BigInteger, ForeignKey('consumer.id'))
     company_id = Column(BigInteger, ForeignKey('company.id'))
 
@@ -302,8 +302,8 @@ class Basket(Base):
 class BasketObject(Base):
     __tablename__ = 'basket_object'
     id = Column(BigInteger, primary_key=True)
-    title = Column(String)
-    image_link = Column(String)
+    title = Column(String(255))
+    image_link = Column(String(255))
     price = Column(Double)
     amount = Column(Integer)
     company_id = Column(BigInteger, ForeignKey('company.id'))
@@ -371,8 +371,8 @@ class Wish(Base):
 class WishObject(Base):
     __tablename__ = 'wish_object'
     id = Column(BigInteger, primary_key=True)
-    title = Column(String)
-    image_link = Column(String)
+    title = Column(String(255))
+    image_link = Column(String(255))
     price = Column(Double)
     company_id = Column(BigInteger, ForeignKey('company.id'))
     user_id = Column(BigInteger, ForeignKey('consumer.id'))
@@ -417,7 +417,7 @@ class WishObject(Base):
 class AccessToken(Base):
     __tablename__ = 'access_token'
     id = Column(BigInteger, primary_key=True)
-    value = Column(String)
+    value = Column(String(255))
 
     @staticmethod
     def get_token():
@@ -431,4 +431,4 @@ class AccessToken(Base):
         session.commit()
 
 # initialize all tables
-# Base.metadata.create_all(engine)
+Base.metadata.create_all(engine)
