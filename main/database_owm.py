@@ -1,4 +1,5 @@
-from sqlalchemy import create_engine, Column, Integer, BigInteger, Double, Text, ForeignKey, String, func, Date, \
+from sqlalchemy import create_engine, Column, Integer, BigInteger, Sequence, Double, Text, ForeignKey, String, func, \
+    Date, \
     Time, DateTime
 from sqlalchemy.orm import sessionmaker, declarative_base
 from passlib.hash import bcrypt
@@ -217,7 +218,7 @@ class Country(Base):
 
 
 class Kitchen(Base):
-    __tablename__ = 'kitchen_categories'
+    __tablename__ = 'kitchen_category'
     id = Column(BigInteger, primary_key=True)
     title = Column(String(255))
 
@@ -232,12 +233,12 @@ class Kitchen(Base):
 
 class Company(Base):
     __tablename__ = 'company'
-    id = Column(BigInteger, primary_key=True)
+    id = Column(BigInteger, Sequence('company_id_seq', start=10), primary_key=True)
     title = Column(String(255))
     description = Column(String(255))
     image_link = Column(String(255))
     rating = Column(Integer)
-    category_id = Column(BigInteger, ForeignKey('kitchen_categories.id'))
+    category_id = Column(BigInteger, ForeignKey('kitchen_category.id'))
     country_id = Column(BigInteger, ForeignKey('company_country.id'))
 
     @staticmethod
@@ -279,7 +280,7 @@ class Company(Base):
 
 class Product(Base):
     __tablename__ = 'product'
-    id = Column(BigInteger, primary_key=True)
+    id = Column(BigInteger, Sequence('product_id_seq', start=50), primary_key=True)
     title = Column(String(255))
     description = Column(String(255))
     composition = Column(String(255))
@@ -343,7 +344,7 @@ class Message(Base):
 
 
 class MessageLike(Base):
-    __tablename__ = 'message_likes'
+    __tablename__ = 'message_like'
     message_id = Column(BigInteger, ForeignKey('message.id'), primary_key=True)
     user_id = Column(BigInteger, ForeignKey('consumer.id'), primary_key=True)
 
