@@ -1,20 +1,9 @@
 import dropbox.files
 import dropbox.exceptions
-import pandas
-import sqlalchemy
 import main
 from dropbox import DropboxOAuth2FlowNoRedirect
 import config
 import database_owm as database
-
-engine = sqlalchemy.create_engine(
-    f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_test_password}@{config.postgres_test_host}:5432"
-    f"/{config.postgres_test_database}")
-
-
-# engine = sqlalchemy.create_engine(
-#     f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_password}@{config.postgres_host}:5432"
-#     f"/{config.postgres_database}")
 
 
 def dbx_init_token(message, photo_bytes, bot, values):
@@ -59,10 +48,9 @@ def upload_file(message, photo_bytes, bot, values):
     dbx = get_dbx(message, bot, values, photo_bytes)
     bot.send_message(message.chat.id, "Don't do anything and wait an answer")
     try:
-        data = pandas.read_sql(values.get('type').lower(), engine)
-        path = "/FlowImages/" + values.get('type').upper() + "/" + values.get('type') + str(max(
-            data['id'].values + 1)) + ".jpg"
-
+        item_id = database.Company.get_max_id() + 1 if values.get(
+            'type').upper() == 'COMPANY' else database.Product.get_max_id() + 1
+        path = "/FlowImages/" + values.get('type').upper() + "/" + values.get('type') + str(item_id) + ".jpg"
         dbx.files_upload(photo_bytes, path)
         url = dbx.sharing_create_shared_link_with_settings(path).url.replace("www.dropbox.com",
                                                                              "dl.dropboxusercontent.com")

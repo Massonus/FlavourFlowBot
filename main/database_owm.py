@@ -1,18 +1,18 @@
 from sqlalchemy import create_engine, Column, Integer, BigInteger, Sequence, Double, Text, ForeignKey, String, func, \
-    Date, \
+    Date, text, \
     Time, DateTime
 from sqlalchemy.orm import sessionmaker, declarative_base
 from passlib.hash import bcrypt
 import config
 import dropbox_factory as dropbox
 
-engine = create_engine(
-    f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_test_password}@{config.postgres_test_host}:5432"
-    f"/{config.postgres_practice_database}")
-
 # engine = create_engine(
-#     f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_password}@{config.postgres_host}:5432"
-#     f"/{config.postgres_database}")
+#     f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_test_password}@{config.postgres_test_host}:5432"
+#     f"/{config.postgres_practice_database}")
+
+engine = create_engine(
+    f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_password}@{config.postgres_host}:5432"
+    f"/{config.postgres_database}")
 
 Session = sessionmaker(bind=engine)
 Base = declarative_base()
@@ -218,7 +218,7 @@ class Country(Base):
 
 
 class Kitchen(Base):
-    __tablename__ = 'kitchen_category'
+    __tablename__ = 'kitchen_categories'
     id = Column(BigInteger, primary_key=True)
     title = Column(String(255))
 
@@ -233,12 +233,12 @@ class Kitchen(Base):
 
 class Company(Base):
     __tablename__ = 'company'
-    id = Column(BigInteger, Sequence('company_id_seq', start=10), primary_key=True)
+    id = Column(BigInteger, Sequence('company_seq', start=10), primary_key=True)
     title = Column(String(255))
     description = Column(String(255))
     image_link = Column(String(255))
     rating = Column(Integer)
-    category_id = Column(BigInteger, ForeignKey('kitchen_category.id'))
+    category_id = Column(BigInteger, ForeignKey('kitchen_categories.id'))
     country_id = Column(BigInteger, ForeignKey('company_country.id'))
 
     @staticmethod
@@ -258,8 +258,10 @@ class Company(Base):
     @staticmethod
     def add_new(values):
         company_id = Company.get_max_id() + 1
-        values.update({'rating': 0, 'id': company_id})
+        values.update({'rating': None, 'id': company_id})
         session.add(Company(**values))
+        sql = text(f"SELECT setval('public.company_seq', {company_id}, true);")
+        engine.connect().execute(sql)
         session.commit()
 
     @staticmethod
@@ -280,7 +282,7 @@ class Company(Base):
 
 class Product(Base):
     __tablename__ = 'product'
-    id = Column(BigInteger, Sequence('product_id_seq', start=50), primary_key=True)
+    id = Column(BigInteger, Sequence('product_seq', start=50), primary_key=True)
     title = Column(String(255))
     description = Column(String(255))
     composition = Column(String(255))
@@ -323,6 +325,8 @@ class Product(Base):
         product_id = Product.get_max_id() + 1
         values.update({'id': product_id})
         session.add(Product(**values))
+        sql = text(f"SELECT setval('public.product_seq', {product_id}, true);")
+        engine.connect().execute(sql)
         session.commit()
 
 
@@ -344,15 +348,15 @@ class Message(Base):
 
 
 class MessageLike(Base):
-    __tablename__ = 'message_like'
+    __tablename__ = 'message_likes'
     message_id = Column(BigInteger, ForeignKey('message.id'), primary_key=True)
     user_id = Column(BigInteger, ForeignKey('consumer.id'), primary_key=True)
 
 
 class CompanyMessage(Base):
-    __tablename__ = 'company_message'
+    __tablename__ = 'company_messages'
     company_id = Column(BigInteger, ForeignKey('company.id'), primary_key=True)
-    message_id = Column(BigInteger, ForeignKey('message.id'), primary_key=True)
+    messages_id = Column(BigInteger, ForeignKey('message.id'), primary_key=True)
 
 
 class Consumer(Base):
