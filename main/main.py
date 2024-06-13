@@ -245,8 +245,6 @@ def delete_product(message, product_id):
 def delete_company(message, company_id):
     bot.delete_message(message.chat.id, message.message_id)
     database.Company.delete(message, bot, company_id)
-    bot.send_message(message.chat.id, 'Deleted successfully')
-    main_menu(message)
 
 
 def image_question(message, product_category=None, company_id=None):

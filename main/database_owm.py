@@ -5,6 +5,7 @@ from sqlalchemy.orm import sessionmaker, declarative_base, exc
 from passlib.hash import bcrypt
 import config
 import dropbox_factory as dropbox
+from main import main_menu
 
 engine = create_engine(
     f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_test_password}@{config.postgres_test_host}:5432"
@@ -56,6 +57,7 @@ class Basket(Base):
     def add_new(user_id):
         basket_id = Basket.get_max_id() + 1
         session.add(Basket(id=basket_id, user_id=user_id))
+        change_sequence(Basket.__tablename__, basket_id)
         session.commit()
 
 
@@ -91,8 +93,9 @@ class BasketObject(Base):
             session.commit()
             return f"Changed amount {basket_object.amount}"
         else:
+            basket_object_id = BasketObject.get_max_id() + 1
             product = Product.get_by_id(product_id)
-            values = {'id': BasketObject.get_max_id() + 1,
+            values = {'id': basket_object_id,
                       'title': product.title,
                       'image_link': product.image_link,
                       'user_id': user_id,
@@ -104,6 +107,7 @@ class BasketObject(Base):
 
             new_object = BasketObject(**values)
             session.add(new_object)
+            change_sequence(BasketObject.__tablename__, basket_object_id)
             session.commit()
             return "Added to basket"
 
@@ -125,6 +129,7 @@ class Wish(Base):
     def add_new(user_id):
         wish_id = Wish.get_max_id() + 1
         session.add(Wish(id=wish_id, user_id=user_id))
+        change_sequence(Wish.__tablename__, wish_id)
         session.commit()
 
 
@@ -158,8 +163,9 @@ class WishObject(Base):
             session.commit()
             return f"Deleted from wishes"
         else:
+            wish_object_id = WishObject.get_max_id() + 1
             product = Product.get_by_id(product_id)
-            values = {'id': WishObject.get_max_id() + 1,
+            values = {'id': wish_object_id,
                       'title': product.title,
                       'image_link': product.image_link,
                       'user_id': user_id,
@@ -170,6 +176,7 @@ class WishObject(Base):
 
             new_object = WishObject(**values)
             session.add(new_object)
+            change_sequence(WishObject.__tablename__, wish_object_id)
             session.commit()
             return "Added to wishes"
 
@@ -221,7 +228,7 @@ class Country(Base):
 
 
 class Kitchen(Base):
-    __tablename__ = 'kitchen_categories'
+    __tablename__ = 'kitchen_category'
     id = Column(BigInteger, primary_key=True)
     title = Column(String(255))
 
@@ -241,7 +248,7 @@ class Company(Base):
     description = Column(String(255))
     image_link = Column(String(255))
     rating = Column(Integer)
-    category_id = Column(BigInteger, ForeignKey('kitchen_categories.id'))
+    category_id = Column(BigInteger, ForeignKey('kitchen_category.id'))
     country_id = Column(BigInteger, ForeignKey('company_country.id'))
 
     @staticmethod
@@ -263,8 +270,7 @@ class Company(Base):
         company_id = Company.get_max_id() + 1
         values.update({'rating': None, 'id': company_id})
         session.add(Company(**values))
-        sql = text(f"SELECT setval('public.company_seq', {company_id}, true);")
-        engine.connect().execute(sql)
+        change_sequence(Company.__tablename__, company_id)
         session.commit()
 
     @staticmethod
@@ -272,15 +278,25 @@ class Company(Base):
         company = session.query(Company).filter_by(id=company_id).first()
         image_link = company.image_link
 
-        products = Product.get_all_by_company_id(company_id)
-        for product in products:
-            Product.delete(message, bot, product.id)
-
         if "dropbox" in image_link:
             values = {'type': 'company', 'id': str(company_id)}
             dropbox.delete_file(message, bot, values)
+        else:
+            Company.delete_directly(company_id, bot, message)
+            main_menu(message)
+
+    @staticmethod
+    def delete_directly(company_id, bot, message):
+        products = Product.get_all_by_company_id(company_id)
+        for product in products:
+            Product.delete(message=message, bot=bot, product_id=product.id)
+
+        company = session.query(Company).filter_by(id=company_id).first()
+        title = company.title
         session.delete(company)
         session.commit()
+        bot.send_message(message.chat.id, f'Company: {title} deleted successfully')
+        return True
 
 
 class Product(Base):
@@ -316,8 +332,18 @@ class Product(Base):
         if "dropbox" in image_link:
             values = {'type': 'product', 'id': str(product_id)}
             dropbox.delete_file(message, bot, values)
+        else:
+            Product.delete_directly(product.id, bot, message)
+            main_menu(message)
+
+    @staticmethod
+    def delete_directly(product_id, bot, message):
+        product = session.query(Product).filter_by(id=product_id).first()
+        title = product.title
         session.delete(product)
         session.commit()
+        bot.send_message(message.chat.id, f'Product: {title} deleted successfully')
+        return True
 
     @staticmethod
     def get_max_id():
@@ -328,8 +354,7 @@ class Product(Base):
         product_id = Product.get_max_id() + 1
         values.update({'id': product_id})
         session.add(Product(**values))
-        sql = text(f"SELECT setval('public.product_seq', {product_id}, true);")
-        engine.connect().execute(sql)
+        change_sequence(Product.__tablename__, product_id)
         session.commit()
 
 
@@ -351,15 +376,15 @@ class Message(Base):
 
 
 class MessageLike(Base):
-    __tablename__ = 'message_likes'
+    __tablename__ = 'message_like'
     message_id = Column(BigInteger, ForeignKey('message.id'), primary_key=True)
     user_id = Column(BigInteger, ForeignKey('consumer.id'), primary_key=True)
 
 
 class CompanyMessage(Base):
-    __tablename__ = 'company_messages'
+    __tablename__ = 'company_message'
     company_id = Column(BigInteger, ForeignKey('company.id'), primary_key=True)
-    messages_id = Column(BigInteger, ForeignKey('message.id'), primary_key=True)
+    message_id = Column(BigInteger, ForeignKey('message.id'), primary_key=True)
 
 
 class Consumer(Base):
@@ -404,7 +429,10 @@ class Consumer(Base):
     @staticmethod
     def verify_password(username, password):
         user = Consumer.get_by_username(username)
-        return bcrypt.verify(password, user.password)
+        try:
+            return bcrypt.verify(password, user.password)
+        except TypeError:
+            return False
 
     @staticmethod
     def change_telegram_id(username, telegram_id):
@@ -434,6 +462,7 @@ class Consumer(Base):
              'id': user_id})
         consumer = Consumer(**values)
         session.add(consumer)
+        change_sequence(Consumer.__tablename__, {user_id})
         session.commit()
 
         Basket.add_new(user_id)
@@ -443,7 +472,7 @@ class Consumer(Base):
 
 class PendingUser(Base):
     __tablename__ = 'pending_users'
-    id = Column(Integer, primary_key=True)
+    id = Column(BigInteger, primary_key=True)
     telegram_id = Column(BigInteger)
 
     @staticmethod
@@ -484,6 +513,12 @@ class UserRole(Base):
         new = UserRole(user_id=user_id, roles="USER")
         session.add(new)
         session.commit()
+
+
+def change_sequence(table, value):
+    sql = text(f"SELECT setval('public.{table.lower()}_seq', {value}, true);")
+    engine.connect().execute(sql)
+    session.commit()
 
 
 # initialize all tables
