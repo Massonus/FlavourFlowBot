@@ -34,13 +34,12 @@ def after_init_token(message, bot, auth_flow, photo_bytes, values):
 
 
 def get_dbx(message, bot, values, photo_bytes=None):
-    token = database.AccessToken.get_token().value
-
     try:
+        token = database.AccessToken.get_token().value
         dbx = dropbox.Dropbox(token)
         dbx.users_get_current_account()
         return dbx
-    except dropbox.exceptions.AuthError:
+    except (dropbox.exceptions.AuthError, AttributeError):
         dbx_init_token(message, photo_bytes, bot, values)
 
 

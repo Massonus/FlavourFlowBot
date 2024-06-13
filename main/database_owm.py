@@ -1,18 +1,18 @@
-from sqlalchemy import create_engine, Column, Integer, BigInteger, Sequence, Double, Text, ForeignKey, String, func, \
-    Date, text, \
-    Time, DateTime
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy import (create_engine, Column, Integer, BigInteger,
+                        Sequence, Double, Text, ForeignKey,
+                        String, func, Date, text, Time, DateTime)
+from sqlalchemy.orm import sessionmaker, declarative_base, exc
 from passlib.hash import bcrypt
 import config
 import dropbox_factory as dropbox
 
-# engine = create_engine(
-#     f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_test_password}@{config.postgres_test_host}:5432"
-#     f"/{config.postgres_practice_database}")
-
 engine = create_engine(
-    f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_password}@{config.postgres_host}:5432"
-    f"/{config.postgres_database}")
+    f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_test_password}@{config.postgres_test_host}:5432"
+    f"/{config.postgres_practice_database}")
+
+# engine = create_engine(
+#     f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_password}@{config.postgres_host}:5432"
+#     f"/{config.postgres_database}")
 
 Session = sessionmaker(bind=engine)
 Base = declarative_base()
@@ -30,8 +30,11 @@ class AccessToken(Base):
 
     @staticmethod
     def update_token(value):
-        access_token = AccessToken.get_token()
-        session.delete(access_token)
+        try:
+            access_token = AccessToken.get_token()
+            session.delete(access_token)
+        except exc.UnmappedInstanceError:
+            print("Token is empty. adding new one")
         session.add(AccessToken(id=1, value=value))
         session.commit()
 
@@ -444,13 +447,19 @@ class PendingUser(Base):
     telegram_id = Column(BigInteger)
 
     @staticmethod
+    def get_max_id():
+        result = session.query(func.max(PendingUser.id)).first()[0]
+        return result if result is not None else 0
+
+    @staticmethod
     def is_pending(telegram_id):
         result = session.query(PendingUser).filter_by(telegram_id=telegram_id).first()
         return True if result is not None else False
 
     @staticmethod
     def add_new_pending(telegram_id):
-        pending = PendingUser(telegram_id=telegram_id)
+        pending_id = PendingUser.get_max_id() + 1
+        pending = PendingUser(id=pending_id, telegram_id=telegram_id)
         session.add(pending)
         session.commit()
 
