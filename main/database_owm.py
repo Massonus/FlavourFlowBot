@@ -1,12 +1,15 @@
-from sqlalchemy import create_engine, Column, Integer, BigInteger, Double, ForeignKey, String, DateTime, func
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy import (create_engine, Column, Integer, BigInteger,
+                        Sequence, Double, Text, ForeignKey,
+                        String, func, Date, text, Time, DateTime)
+from sqlalchemy.orm import sessionmaker, declarative_base, exc
 from passlib.hash import bcrypt
 import config
 import dropbox_factory as dropbox
+from main import main_menu
 
 engine = create_engine(
     f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_test_password}@{config.postgres_test_host}:5432"
-    f"/{config.postgres_test_database}")
+    f"/{config.postgres_practice_database}")
 
 # engine = create_engine(
 #     f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_password}@{config.postgres_host}:5432"
@@ -17,13 +20,380 @@ Base = declarative_base()
 session = Session()
 
 
+class AccessToken(Base):
+    __tablename__ = 'access_token'
+    id = Column(BigInteger, primary_key=True)
+    value = Column(String(255))
+
+    @staticmethod
+    def get_token():
+        return session.query(AccessToken).first()
+
+    @staticmethod
+    def update_token(value):
+        try:
+            access_token = AccessToken.get_token()
+            session.delete(access_token)
+        except exc.UnmappedInstanceError:
+            print("Token is empty. adding new one")
+        session.add(AccessToken(id=1, value=value))
+        session.commit()
+
+
+class Basket(Base):
+    __tablename__ = 'basket'
+    id = Column(BigInteger, primary_key=True)
+    user_id = Column(BigInteger, ForeignKey('consumer.id'))
+
+    @staticmethod
+    def get_by_user_id(user_id):
+        return session.query(Basket).filter_by(user_id=user_id).first()
+
+    @staticmethod
+    def get_max_id():
+        return session.query(func.max(Basket.id)).first()[0]
+
+    @staticmethod
+    def add_new(user_id):
+        basket_id = Basket.get_max_id() + 1
+        session.add(Basket(id=basket_id, user_id=user_id))
+        change_sequence(Basket.__tablename__, basket_id)
+        session.commit()
+
+
+class BasketObject(Base):
+    __tablename__ = 'basket_object'
+    id = Column(BigInteger, primary_key=True)
+    title = Column(String(255))
+    image_link = Column(String(255))
+    price = Column(Double)
+    amount = Column(Integer)
+    company_id = Column(BigInteger, ForeignKey('company.id'))
+    user_id = Column(BigInteger, ForeignKey('consumer.id'))
+    basket_id = Column(BigInteger, ForeignKey('basket.id'))
+    product_id = Column(BigInteger, ForeignKey('product.id'))
+
+    @staticmethod
+    def get_by_product_and_user_id(product_id, user_id):
+        return session.query(BasketObject).where(BasketObject.product_id == product_id,
+                                                 BasketObject.user_id == user_id).first()
+
+    @staticmethod
+    def get_max_id():
+        result = session.query(func.max(BasketObject.id)).first()[0]
+        return result if result is not None else 0
+
+    @staticmethod
+    def add_new(product_id, telegram_id):
+        user_id = Consumer.get_by_telegram_id(telegram_id).id
+        basket_object = BasketObject.get_by_product_and_user_id(product_id, user_id)
+
+        if basket_object is not None:
+            basket_object.amount += 1
+            session.commit()
+            return f"Changed amount {basket_object.amount}"
+        else:
+            basket_object_id = BasketObject.get_max_id() + 1
+            product = Product.get_by_id(product_id)
+            values = {'id': basket_object_id,
+                      'title': product.title,
+                      'image_link': product.image_link,
+                      'user_id': user_id,
+                      'product_id': product_id,
+                      'company_id': product.company_id,
+                      'basket_id': Basket.get_by_user_id(user_id).id,
+                      'price': product.price,
+                      'amount': 1}
+
+            new_object = BasketObject(**values)
+            session.add(new_object)
+            change_sequence(BasketObject.__tablename__, basket_object_id)
+            session.commit()
+            return "Added to basket"
+
+
+class Wish(Base):
+    __tablename__ = 'wishes'
+    id = Column(BigInteger, primary_key=True)
+    user_id = Column(BigInteger, ForeignKey('consumer.id'))
+
+    @staticmethod
+    def get_by_user_id(user_id):
+        return session.query(Wish).filter_by(user_id=user_id).first()
+
+    @staticmethod
+    def get_max_id():
+        return session.query(func.max(Wish.id)).first()[0]
+
+    @staticmethod
+    def add_new(user_id):
+        wish_id = Wish.get_max_id() + 1
+        session.add(Wish(id=wish_id, user_id=user_id))
+        change_sequence(Wish.__tablename__, wish_id)
+        session.commit()
+
+
+class WishObject(Base):
+    __tablename__ = 'wish_object'
+    id = Column(BigInteger, primary_key=True)
+    title = Column(String(255))
+    image_link = Column(String(255))
+    price = Column(Double)
+    company_id = Column(BigInteger, ForeignKey('company.id'))
+    user_id = Column(BigInteger, ForeignKey('consumer.id'))
+    wish_id = Column(BigInteger, ForeignKey('wishes.id'))
+    product_id = Column(BigInteger, ForeignKey('product.id'))
+
+    @staticmethod
+    def get_max_id():
+        return session.query(func.max(WishObject.id)).first()[0]
+
+    @staticmethod
+    def get_by_product_and_user_id(product_id, user_id):
+        return session.query(WishObject).where(WishObject.product_id == product_id,
+                                               WishObject.user_id == user_id).first()
+
+    @staticmethod
+    def add_new(product_id, telegram_id):
+        user_id = Consumer.get_by_telegram_id(telegram_id).id
+        wish_object = WishObject.get_by_product_and_user_id(product_id, user_id)
+
+        if wish_object is not None:
+            session.delete(wish_object)
+            session.commit()
+            return f"Deleted from wishes"
+        else:
+            wish_object_id = WishObject.get_max_id() + 1
+            product = Product.get_by_id(product_id)
+            values = {'id': wish_object_id,
+                      'title': product.title,
+                      'image_link': product.image_link,
+                      'user_id': user_id,
+                      'product_id': product_id,
+                      'company_id': product.company_id,
+                      'wish_id': Wish.get_by_user_id(user_id).id,
+                      'price': product.price}
+
+            new_object = WishObject(**values)
+            session.add(new_object)
+            change_sequence(WishObject.__tablename__, wish_object_id)
+            session.commit()
+            return "Added to wishes"
+
+
+class Order(Base):
+    __tablename__ = 'orders'
+    id = Column(BigInteger, primary_key=True)
+    total = Column(Double)
+    date = Column(Date)
+    time = Column(Time)
+    earned_bonuses = Column(Double)
+    address = Column(String(255))
+    user_id = Column(BigInteger, ForeignKey('consumer.id'))
+    company_id = Column(BigInteger, ForeignKey('company.id'))
+
+    @staticmethod
+    def get_by_id(kitchen_id):
+        return session.query(Kitchen).filter_by(id=kitchen_id).first()
+
+    @staticmethod
+    def get_all_by_user_id(user_id):
+        return session.query(Order).filter_by(user_id=user_id).all()
+
+
+class OrderObject(Base):
+    __tablename__ = 'order_object'
+    id = Column(BigInteger, primary_key=True)
+    title = Column(String(255))
+    amount = Column(Integer)
+    sum = Column(Double)
+    user_id = Column(BigInteger, ForeignKey('consumer.id'))
+    order_id = Column(BigInteger, ForeignKey('orders.id'))
+    product_id = Column(BigInteger, ForeignKey('product.id'))
+    company_id = Column(BigInteger, ForeignKey('company.id'))
+
+
+class Country(Base):
+    __tablename__ = 'company_country'
+    id = Column(BigInteger, primary_key=True)
+    title = Column(String(255))
+
+    @staticmethod
+    def get_by_id(country_id):
+        return session.query(Country).filter_by(id=country_id).first()
+
+    @staticmethod
+    def get_all():
+        return session.query(Country).all()
+
+
+class Kitchen(Base):
+    __tablename__ = 'kitchen_category'
+    id = Column(BigInteger, primary_key=True)
+    title = Column(String(255))
+
+    @staticmethod
+    def get_by_id(kitchen_id):
+        return session.query(Kitchen).filter_by(id=kitchen_id).first()
+
+    @staticmethod
+    def get_all():
+        return session.query(Kitchen).all()
+
+
+class Company(Base):
+    __tablename__ = 'company'
+    id = Column(BigInteger, Sequence('company_seq', start=10), primary_key=True)
+    title = Column(String(255))
+    description = Column(String(255))
+    image_link = Column(String(255))
+    rating = Column(Integer)
+    category_id = Column(BigInteger, ForeignKey('kitchen_category.id'))
+    country_id = Column(BigInteger, ForeignKey('company_country.id'))
+
+    @staticmethod
+    def get_company_by_id(company_id):
+        return session.query(Company).filter_by(id=company_id).first()
+
+    @staticmethod
+    def get_for_catalog(page=1, skip_size=1):
+        skips_page = (page - 1) * skip_size
+        company_count = session.query(Company).count()
+        return session.query(Company).order_by(Company.title).offset(skips_page).limit(skip_size).first(), company_count
+
+    @staticmethod
+    def get_max_id():
+        return session.query(func.max(Company.id)).first()[0]
+
+    @staticmethod
+    def add_new(values):
+        company_id = Company.get_max_id() + 1
+        values.update({'rating': None, 'id': company_id})
+        session.add(Company(**values))
+        change_sequence(Company.__tablename__, company_id)
+        session.commit()
+
+    @staticmethod
+    def delete(message, bot, company_id):
+        company = session.query(Company).filter_by(id=company_id).first()
+        image_link = company.image_link
+
+        if "dropbox" in image_link:
+            values = {'type': 'company', 'id': str(company_id)}
+            dropbox.delete_file(message, bot, values)
+        else:
+            Company.delete_directly(company_id, bot, message)
+            main_menu(message)
+
+    @staticmethod
+    def delete_directly(company_id, bot, message):
+        products = Product.get_all_by_company_id(company_id)
+        for product in products:
+            Product.delete(message=message, bot=bot, product_id=product.id)
+
+        company = session.query(Company).filter_by(id=company_id).first()
+        title = company.title
+        session.delete(company)
+        session.commit()
+        bot.send_message(message.chat.id, f'Company: {title} deleted successfully')
+        return True
+
+
+class Product(Base):
+    __tablename__ = 'product'
+    id = Column(BigInteger, Sequence('product_seq', start=50), primary_key=True)
+    title = Column(String(255))
+    description = Column(String(255))
+    composition = Column(String(255))
+    image_link = Column(String(255))
+    product_category = Column(Text)
+    price = Column(Double)
+    company_id = Column(BigInteger, ForeignKey('company.id'))
+
+    @staticmethod
+    def get_by_id(product_id):
+        return session.query(Product).filter_by(id=product_id).first()
+
+    @staticmethod
+    def get_for_catalog(company_id, page=1, skip_size=1):
+        skips_page = (page - 1) * skip_size
+        product_count = session.query(Product).where(Product.company_id == company_id).count()
+        return session.query(Product).where(Product.company_id == company_id).order_by(Product.title).offset(
+            skips_page).limit(skip_size).first(), product_count
+
+    @staticmethod
+    def get_all_by_company_id(company_id):
+        return session.query(Product).filter_by(company_id=company_id).all()
+
+    @staticmethod
+    def delete(message, bot, product_id):
+        product = session.query(Product).filter_by(id=product_id).first()
+        image_link = product.image_link
+        if "dropbox" in image_link:
+            values = {'type': 'product', 'id': str(product_id)}
+            dropbox.delete_file(message, bot, values)
+        else:
+            Product.delete_directly(product.id, bot, message)
+            main_menu(message)
+
+    @staticmethod
+    def delete_directly(product_id, bot, message):
+        product = session.query(Product).filter_by(id=product_id).first()
+        title = product.title
+        session.delete(product)
+        session.commit()
+        bot.send_message(message.chat.id, f'Product: {title} deleted successfully')
+        return True
+
+    @staticmethod
+    def get_max_id():
+        return session.query(func.max(Product.id)).first()[0]
+
+    @staticmethod
+    def add_new(values):
+        product_id = Product.get_max_id() + 1
+        values.update({'id': product_id})
+        session.add(Product(**values))
+        change_sequence(Product.__tablename__, product_id)
+        session.commit()
+
+
+class Rating(Base):
+    __tablename__ = 'rating'
+    id = Column(BigInteger, primary_key=True)
+    rate = Column(Integer)
+    user_id = Column(BigInteger, ForeignKey('consumer.id'))
+    company_id = Column(BigInteger, ForeignKey('company.id'))
+
+
+class Message(Base):
+    __tablename__ = 'message'
+    id = Column(BigInteger, primary_key=True)
+    text = Column(String(255))
+    comment_time = Column(DateTime)
+    user_id = Column(BigInteger, ForeignKey('consumer.id'))
+    item_id = Column(BigInteger)
+
+
+class MessageLike(Base):
+    __tablename__ = 'message_like'
+    message_id = Column(BigInteger, ForeignKey('message.id'), primary_key=True)
+    user_id = Column(BigInteger, ForeignKey('consumer.id'), primary_key=True)
+
+
+class CompanyMessage(Base):
+    __tablename__ = 'company_message'
+    company_id = Column(BigInteger, ForeignKey('company.id'), primary_key=True)
+    message_id = Column(BigInteger, ForeignKey('message.id'), primary_key=True)
+
+
 class Consumer(Base):
     __tablename__ = 'consumer'
-    id = Column(Integer, primary_key=True)
-    username = Column(String)
-    email = Column(String)
-    password = Column(String)
-    redactor = Column(String)
+    id = Column(BigInteger, primary_key=True)
+    username = Column(String(255))
+    email = Column(String(255))
+    password = Column(String(255))
+    redactor = Column(String(255))
     bonuses = Column(Double)
     telegram_id = Column(BigInteger)
 
@@ -59,7 +429,10 @@ class Consumer(Base):
     @staticmethod
     def verify_password(username, password):
         user = Consumer.get_by_username(username)
-        return bcrypt.verify(password, user.password)
+        try:
+            return bcrypt.verify(password, user.password)
+        except TypeError:
+            return False
 
     @staticmethod
     def change_telegram_id(username, telegram_id):
@@ -89,6 +462,7 @@ class Consumer(Base):
              'id': user_id})
         consumer = Consumer(**values)
         session.add(consumer)
+        change_sequence(Consumer.__tablename__, {user_id})
         session.commit()
 
         Basket.add_new(user_id)
@@ -98,8 +472,13 @@ class Consumer(Base):
 
 class PendingUser(Base):
     __tablename__ = 'pending_users'
-    id = Column(Integer, primary_key=True)
+    id = Column(BigInteger, primary_key=True)
     telegram_id = Column(BigInteger)
+
+    @staticmethod
+    def get_max_id():
+        result = session.query(func.max(PendingUser.id)).first()[0]
+        return result if result is not None else 0
 
     @staticmethod
     def is_pending(telegram_id):
@@ -108,7 +487,8 @@ class PendingUser(Base):
 
     @staticmethod
     def add_new_pending(telegram_id):
-        pending = PendingUser(telegram_id=telegram_id)
+        pending_id = PendingUser.get_max_id() + 1
+        pending = PendingUser(id=pending_id, telegram_id=telegram_id)
         session.add(pending)
         session.commit()
 
@@ -121,8 +501,8 @@ class PendingUser(Base):
 
 class UserRole(Base):
     __tablename__ = 'user_role'
-    user_id = Column(Integer, ForeignKey('consumer.id'), primary_key=True)
-    roles = Column(String)
+    user_id = Column(BigInteger, ForeignKey('consumer.id'), primary_key=True)
+    roles = Column(String(255))
 
     @staticmethod
     def get_by_user_id(user_id):
@@ -135,298 +515,12 @@ class UserRole(Base):
         session.commit()
 
 
-class Company(Base):
-    __tablename__ = 'company'
-    id = Column(Integer, primary_key=True)
-    title = Column(String)
-    description = Column(String)
-    image_link = Column(String)
-    rating = Column(Integer)
-    category_id = Column(Integer, ForeignKey('kitchen_categories.id'))
-    country_id = Column(Integer, ForeignKey('company_country.id'))
+def change_sequence(table, value):
+    sql = text(f"SELECT setval('public.{table.lower()}_seq', {value}, true);")
+    engine.connect().execute(sql)
+    session.commit()
 
-    @staticmethod
-    def get_company_by_id(company_id):
-        return session.query(Company).filter_by(id=company_id).first()
-
-    @staticmethod
-    def get_for_catalog(page=1, skip_size=1):
-        skips_page = (page - 1) * skip_size
-        company_count = session.query(Company).count()
-        return session.query(Company).order_by(Company.title).offset(skips_page).limit(skip_size).first(), company_count
-
-    @staticmethod
-    def get_max_id():
-        return session.query(func.max(Company.id)).first()[0]
-
-    @staticmethod
-    def add_new(values):
-        company_id = Company.get_max_id() + 1
-        values.update({'rating': 0, 'id': company_id})
-        session.add(Company(**values))
-        session.commit()
-
-    @staticmethod
-    def delete(message, bot, company_id):
-        company = session.query(Company).filter_by(id=company_id).first()
-        image_link = company.image_link
-
-        products = Product.get_all_by_company_id(company_id)
-        for product in products:
-            Product.delete(message, bot, product.id)
-
-        if "dropbox" in image_link:
-            values = {'type': 'company', 'id': str(company_id)}
-            dropbox.delete_file(message, bot, values)
-        session.delete(company)
-        session.commit()
-
-
-class Product(Base):
-    __tablename__ = 'product'
-    id = Column(BigInteger, primary_key=True)
-    title = Column(String)
-    description = Column(String)
-    composition = Column(String)
-    image_link = Column(String)
-    product_category = Column(String)
-    price = Column(Double)
-    company_id = Column(BigInteger, ForeignKey('company.id'))
-
-    @staticmethod
-    def get_by_id(product_id):
-        return session.query(Product).filter_by(id=product_id).first()
-
-    @staticmethod
-    def get_for_catalog(company_id, page=1, skip_size=1):
-        skips_page = (page - 1) * skip_size
-        product_count = session.query(Product).where(Product.company_id == company_id).count()
-        return session.query(Product).where(Product.company_id == company_id).order_by(Product.title).offset(
-            skips_page).limit(skip_size).first(), product_count
-
-    @staticmethod
-    def get_all_by_company_id(company_id):
-        return session.query(Product).filter_by(company_id=company_id).all()
-
-    @staticmethod
-    def delete(message, bot, product_id):
-        product = session.query(Product).filter_by(id=product_id).first()
-        image_link = product.image_link
-        if "dropbox" in image_link:
-            values = {'type': 'product', 'id': str(product_id)}
-            dropbox.delete_file(message, bot, values)
-        session.delete(product)
-        session.commit()
-
-    @staticmethod
-    def get_max_id():
-        return session.query(func.max(Product.id)).first()[0]
-
-    @staticmethod
-    def add_new(values):
-        product_id = Product.get_max_id() + 1
-        values.update({'id': product_id})
-        session.add(Product(**values))
-        session.commit()
-
-
-class Country(Base):
-    __tablename__ = 'company_country'
-    id = Column(BigInteger, primary_key=True)
-    title = Column(String)
-
-    @staticmethod
-    def get_by_id(country_id):
-        return session.query(Country).filter_by(id=country_id).first()
-
-    @staticmethod
-    def get_all():
-        return session.query(Country).all()
-
-
-class Kitchen(Base):
-    __tablename__ = 'kitchen_categories'
-    id = Column(BigInteger, primary_key=True)
-    title = Column(String)
-
-    @staticmethod
-    def get_by_id(kitchen_id):
-        return session.query(Kitchen).filter_by(id=kitchen_id).first()
-
-    @staticmethod
-    def get_all():
-        return session.query(Kitchen).all()
-
-
-class Order(Base):
-    __tablename__ = 'orders'
-    id = Column(BigInteger, primary_key=True)
-    total = Column(Double)
-    date = Column(DateTime)
-    time = Column(DateTime)
-    earned_bonuses = Column(Double)
-    address = Column(String)
-    user_id = Column(BigInteger, ForeignKey('consumer.id'))
-    company_id = Column(BigInteger, ForeignKey('company.id'))
-
-    @staticmethod
-    def get_by_id(kitchen_id):
-        return session.query(Kitchen).filter_by(id=kitchen_id).first()
-
-    @staticmethod
-    def get_all_by_user_id(user_id):
-        return session.query(Order).filter_by(user_id=user_id).all()
-
-
-class Basket(Base):
-    __tablename__ = 'basket'
-    id = Column(BigInteger, primary_key=True)
-    user_id = Column(BigInteger, ForeignKey('consumer.id'))
-
-    @staticmethod
-    def get_by_user_id(user_id):
-        return session.query(Basket).filter_by(user_id=user_id).first()
-
-    @staticmethod
-    def get_max_id():
-        return session.query(func.max(Basket.id)).first()[0]
-
-    @staticmethod
-    def add_new(user_id):
-        basket_id = Basket.get_max_id() + 1
-        session.add(Basket(id=basket_id, user_id=user_id))
-        session.commit()
-
-
-class BasketObject(Base):
-    __tablename__ = 'basket_object'
-    id = Column(BigInteger, primary_key=True)
-    title = Column(String)
-    image_link = Column(String)
-    price = Column(Double)
-    amount = Column(Integer)
-    company_id = Column(BigInteger, ForeignKey('company.id'))
-    user_id = Column(BigInteger, ForeignKey('consumer.id'))
-    basket_id = Column(BigInteger, ForeignKey('basket.id'))
-    product_id = Column(BigInteger, ForeignKey('product.id'))
-
-    @staticmethod
-    def get_by_product_and_user_id(product_id, user_id):
-        return session.query(BasketObject).where(BasketObject.product_id == product_id,
-                                                 BasketObject.user_id == user_id).first()
-
-    @staticmethod
-    def get_max_id():
-        return session.query(func.max(BasketObject.id)).first()[0]
-
-    @staticmethod
-    def add_new(product_id, telegram_id):
-        user_id = Consumer.get_by_telegram_id(telegram_id).id
-        basket_object = BasketObject.get_by_product_and_user_id(product_id, user_id)
-
-        if basket_object is not None:
-            basket_object.amount += 1
-            session.commit()
-            return f"Changed amount {basket_object.amount}"
-        else:
-            product = Product.get_by_id(product_id)
-            values = {'id': BasketObject.get_max_id() + 1,
-                      'title': product.title,
-                      'image_link': product.image_link,
-                      'user_id': user_id,
-                      'product_id': product_id,
-                      'company_id': product.company_id,
-                      'basket_id': Basket.get_by_user_id(user_id).id,
-                      'price': product.price,
-                      'amount': 1}
-
-            new_object = BasketObject(**values)
-            session.add(new_object)
-            session.commit()
-            return "Added to basket"
-
-
-class Wish(Base):
-    __tablename__ = 'wishes'
-    id = Column(BigInteger, primary_key=True)
-    user_id = Column(BigInteger, ForeignKey('consumer.id'))
-
-    @staticmethod
-    def get_by_user_id(user_id):
-        return session.query(Wish).filter_by(user_id=user_id).first()
-
-    @staticmethod
-    def get_max_id():
-        return session.query(func.max(Wish.id)).first()[0]
-
-    @staticmethod
-    def add_new(user_id):
-        wish_id = Wish.get_max_id() + 1
-        session.add(Wish(id=wish_id, user_id=user_id))
-        session.commit()
-
-
-class WishObject(Base):
-    __tablename__ = 'wish_object'
-    id = Column(BigInteger, primary_key=True)
-    title = Column(String)
-    image_link = Column(String)
-    price = Column(Double)
-    company_id = Column(BigInteger, ForeignKey('company.id'))
-    user_id = Column(BigInteger, ForeignKey('consumer.id'))
-    wish_id = Column(BigInteger, ForeignKey('wishes.id'))
-    product_id = Column(BigInteger, ForeignKey('product.id'))
-
-    @staticmethod
-    def get_max_id():
-        return session.query(func.max(WishObject.id)).first()[0]
-
-    @staticmethod
-    def get_by_product_and_user_id(product_id, user_id):
-        return session.query(WishObject).where(WishObject.product_id == product_id,
-                                               WishObject.user_id == user_id).first()
-
-    @staticmethod
-    def add_new(product_id, telegram_id):
-        user_id = Consumer.get_by_telegram_id(telegram_id).id
-        wish_object = WishObject.get_by_product_and_user_id(product_id, user_id)
-
-        if wish_object is not None:
-            session.delete(wish_object)
-            session.commit()
-            return f"Deleted from wishes"
-        else:
-            product = Product.get_by_id(product_id)
-            values = {'id': WishObject.get_max_id() + 1,
-                      'title': product.title,
-                      'image_link': product.image_link,
-                      'user_id': user_id,
-                      'product_id': product_id,
-                      'company_id': product.company_id,
-                      'wish_id': Wish.get_by_user_id(user_id).id,
-                      'price': product.price}
-
-            new_object = WishObject(**values)
-            session.add(new_object)
-            session.commit()
-            return "Added to wishes"
-
-
-class AccessToken(Base):
-    __tablename__ = 'access_token'
-    id = Column(BigInteger, primary_key=True)
-    value = Column(String)
-
-    @staticmethod
-    def get_token():
-        return session.query(AccessToken).first().value
-
-    @staticmethod
-    def update_token(value):
-        access_token = AccessToken.get_token()
-        session.delete(access_token)
-        session.add(AccessToken(id=1, value=value))
-        session.commit()
 
 # initialize all tables
-# Base.metadata.create_all(engine)
+if __name__ == '__main__':
+    Base.metadata.create_all(engine)

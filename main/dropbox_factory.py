@@ -1,20 +1,9 @@
 import dropbox.files
 import dropbox.exceptions
-import pandas
-import sqlalchemy
 import main
 from dropbox import DropboxOAuth2FlowNoRedirect
 import config
 import database_owm as database
-
-engine = sqlalchemy.create_engine(
-    f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_test_password}@{config.postgres_test_host}:5432"
-    f"/{config.postgres_test_database}")
-
-
-# engine = sqlalchemy.create_engine(
-#     f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_password}@{config.postgres_host}:5432"
-#     f"/{config.postgres_database}")
 
 
 def dbx_init_token(message, photo_bytes, bot, values):
@@ -40,35 +29,40 @@ def after_init_token(message, bot, auth_flow, photo_bytes, values):
 
     database.AccessToken.update_token(oauth_result.access_token)
 
-    bot.send_message(message.chat.id, "Successfully set up client! Send your image again")
-    bot.register_next_step_handler(message, upload_file, photo_bytes, bot, values)
+    bot.send_message(message.chat.id, "Successfully set up client!")
+    if photo_bytes is None:
+        delete_file(message, bot, values)
+    else:
+        upload_file(message, photo_bytes, bot, values)
 
 
 def get_dbx(message, bot, values, photo_bytes=None):
-    token = database.AccessToken.get_token()
-
     try:
+        token = database.AccessToken.get_token().value
         dbx = dropbox.Dropbox(token)
         dbx.users_get_current_account()
         return dbx
-    except dropbox.exceptions.AuthError:
+    except (dropbox.exceptions.AuthError, AttributeError):
         dbx_init_token(message, photo_bytes, bot, values)
 
 
 def upload_file(message, photo_bytes, bot, values):
     dbx = get_dbx(message, bot, values, photo_bytes)
-    bot.send_message(message.chat.id, "Don't do anything and wait an answer")
     try:
-        data = pandas.read_sql(values.get('type').lower(), engine)
-        path = "/FlowImages/" + values.get('type').upper() + "/" + values.get('type') + str(max(
-            data['id'].values + 1)) + ".jpg"
+        dbx.users_get_current_account()
+        bot.send_message(message.chat.id, "Don't do anything and wait an answer")
+
+        item_id = database.Company.get_max_id() + 1 if values.get(
+            'type').upper() == 'COMPANY' else database.Product.get_max_id() + 1
+
+        path = "/FlowImages/" + values.get('type').upper() + "/" + values.get('type') + str(item_id) + ".jpg"
 
         dbx.files_upload(photo_bytes, path)
         url = dbx.sharing_create_shared_link_with_settings(path).url.replace("www.dropbox.com",
                                                                              "dl.dropboxusercontent.com")
         values.update({'image_link': url})
         main.add_item_with_dropbox_link(message, values)
-    except AttributeError:
+    except (dropbox.exceptions.AuthError, AttributeError):
         print("Waiting...")
 
 
@@ -78,5 +72,12 @@ def delete_file(message, bot, values):
     dbx = get_dbx(message, bot, values)
     try:
         dbx.files_delete_v2(path)
+        if values.get('type').upper() == 'COMPANY':
+            database.Company.delete_directly(values.get('id'), bot, message)
+        else:
+            database.Product.delete_directly(values.get('id'), bot, message)
+    except AttributeError:
+        print("Waiting oauth...")
     except dropbox.exceptions.ApiError as error:
         bot.send_message(message.chat.id, f'Something is wrong {error}')
+        return False
