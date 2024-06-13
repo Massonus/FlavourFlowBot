@@ -7,13 +7,13 @@ import config
 import dropbox_factory as dropbox
 from main import main_menu
 
-engine = create_engine(
-    f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_test_password}@{config.postgres_test_host}:5432"
-    f"/{config.postgres_practice_database}")
-
 # engine = create_engine(
-#     f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_password}@{config.postgres_host}:5432"
-#     f"/{config.postgres_database}")
+#     f"postgresql+psycopg://{config.postgres_username}:{config.postgres_test_password}@{config.postgres_test_host}:5432"
+#     f"/{config.postgres_practice_database}")
+
+engine = create_engine(
+    f"postgresql+psycopg://{config.postgres_username}:{config.postgres_password}@{config.postgres_host}:5432"
+    f"/{config.postgres_database}")
 
 Session = sessionmaker(bind=engine)
 Base = declarative_base()
