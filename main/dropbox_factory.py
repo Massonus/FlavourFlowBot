@@ -1,6 +1,6 @@
 import dropbox.files
 import dropbox.exceptions
-import main
+import run
 from dropbox import DropboxOAuth2FlowNoRedirect
 import config
 import database_owm as database
@@ -61,7 +61,7 @@ def upload_file(message, photo_bytes, bot, values):
         url = dbx.sharing_create_shared_link_with_settings(path).url.replace("www.dropbox.com",
                                                                              "dl.dropboxusercontent.com")
         values.update({'image_link': url})
-        main.add_item_with_dropbox_link(message, values)
+        run.add_item_with_dropbox_link(message, values)
     except (dropbox.exceptions.AuthError, AttributeError):
         print("Waiting...")
 

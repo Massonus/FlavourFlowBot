@@ -2,8 +2,9 @@ import re
 import telebot
 import database_owm as database
 import dropbox_factory as dropbox
-from config import GROUP_ID, TG_TOKEN
+from config import GROUP_ID, TG_TOKEN, ADMIN_ID
 from telebot import types
+from time import sleep
 
 bot = telebot.TeleBot(TG_TOKEN)
 
@@ -435,7 +436,7 @@ def enter_email(message):
 def enter_registration_password(message, values):
     email = message.text
     values.update({'email': email})
-    if not database.Consumer.is_email_already_exists(email) and re.search(r'^[a-z0-9]+[._]?[a-z0-9]+@\w+[.]\w+$',
+    if not database.Consumer.is_email_already_exists(email) and re.search(r'^[^\s@]+@[^\s@]+\.[^\s@]+$',
                                                                           email) is not None:
         bot.send_message(message.chat.id, "Enter password")
         bot.register_next_step_handler(message, enter_confirm_password, values)
@@ -444,7 +445,7 @@ def enter_registration_password(message, values):
         bot.send_message(message.chat.id, "This email is already in use")
         main_menu(message)
 
-    elif re.search(r'^[a-z0-9]+[._]?[a-z0-9]+@\w+[.]\w+$', email) is None:
+    elif re.search(r'^[^\s@]+@[^\s@]+\.[^\s@]+$', email) is None:
         bot.send_message(message.chat.id, "Incorrect email")
         main_menu(message)
 
@@ -630,4 +631,9 @@ def products_catalog(callback):
 
 
 if __name__ == '__main__':
-    bot.polling(none_stop=True)
+    while True:
+        try:
+            bot.polling(none_stop=True)
+        except Exception as _ex:
+            bot.send_message(ADMIN_ID, f"There is a problem: '{_ex}'. Please wait.")
+            sleep(15)
