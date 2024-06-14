@@ -1,10 +1,12 @@
 import re
+from time import sleep
+
 import telebot
+from telebot import types
+
 import database_owm as database
 import dropbox_factory as dropbox
 from config import GROUP_ID, TG_TOKEN, ADMIN_ID
-from telebot import types
-from time import sleep
 
 bot = telebot.TeleBot(TG_TOKEN)
 
@@ -631,9 +633,12 @@ def products_catalog(callback):
 
 
 if __name__ == '__main__':
+    """this code will catch every exception and reload the bot due 15 seconds"""
     while True:
         try:
             bot.polling(none_stop=True)
-        except Exception as _ex:
-            bot.send_message(ADMIN_ID, f"There is a problem: '{_ex}'. Please wait.")
+        except Exception as ex:
+            bot.send_message(ADMIN_ID, f"<b>ALARM!!! ALARM!!! THE PROBLEM DETECTED!!!:</b>\n"
+                                       f"{ex}", parse_mode='html')
+            database.session.rollback()
             sleep(15)

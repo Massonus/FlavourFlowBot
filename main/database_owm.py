@@ -1,8 +1,9 @@
+from passlib.hash import bcrypt
 from sqlalchemy import (create_engine, Column, Integer, BigInteger,
                         Sequence, Double, Text, ForeignKey,
                         String, func, Date, text, Time, DateTime)
 from sqlalchemy.orm import sessionmaker, declarative_base, exc
-from passlib.hash import bcrypt
+
 import config
 import dropbox_factory as dropbox
 
@@ -517,6 +518,8 @@ def change_sequence(table, value):
     engine.connect().execute(sql)
     session.commit()
 
+
 # initialize all tables
-# if __name__ == '__main__':
-#     Base.metadata.create_all(engine)
+if __name__ == '__main__':
+    # Base.metadata.create_all(engine)
+    Base.metadata.tables['consumer'].create(bind=engine)

@@ -1,9 +1,10 @@
-import dropbox.files
 import dropbox.exceptions
-import run
+import dropbox.files
 from dropbox import DropboxOAuth2FlowNoRedirect
+
 import config
 import database_owm as database
+import run
 
 
 def dbx_init_token(message, photo_bytes, bot, values):
@@ -73,9 +74,9 @@ def delete_file(message, bot, values):
     try:
         dbx.files_delete_v2(path)
         if values.get('type').upper() == 'COMPANY':
-            database.Company.delete_directly(values.get('id'), bot, message)
+            database.Company.delete_directly(int(values.get('id')), bot, message)
         else:
-            database.Product.delete_directly(values.get('id'), bot, message)
+            database.Product.delete_directly(int(values.get('id')), bot, message)
     except AttributeError:
         print("Waiting oauth...")
     except dropbox.exceptions.ApiError as error:
