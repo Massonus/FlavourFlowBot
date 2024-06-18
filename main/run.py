@@ -6,7 +6,7 @@ from telebot import types
 
 import database_owm as database
 import dropbox_factory as dropbox
-from config import GROUP_ID, TG_TOKEN, ADMIN_ID
+from config import GROUP_ID, TG_TOKEN, ADMIN_ID, ADMIN2_ID
 
 bot = telebot.TeleBot(TG_TOKEN)
 
@@ -638,7 +638,10 @@ if __name__ == '__main__':
         try:
             bot.polling(none_stop=True)
         except Exception as ex:
+            print(ex.__traceback__)
             bot.send_message(ADMIN_ID, f"<b>ALARM!!! ALARM!!! THE PROBLEM DETECTED!!!:</b>\n"
                                        f"{ex}", parse_mode='html')
+            bot.send_message(ADMIN2_ID, f"<b>ALARM!!! ALARM!!! THE PROBLEM DETECTED!!!:</b>\n"
+                                        f"{ex}", parse_mode='html')
             database.session.rollback()
             sleep(15)
