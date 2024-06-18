@@ -640,8 +640,8 @@ if __name__ == '__main__':
         except Exception as ex:
             print(ex.__traceback__)
             bot.send_message(ADMIN_ID, f"<b>ALARM!!! ALARM!!! THE PROBLEM DETECTED!!!:</b>\n"
-                                       f"{ex}", parse_mode='html')
+                                       f"{ex.__traceback__}", parse_mode='html')
             bot.send_message(ADMIN2_ID, f"<b>ALARM!!! ALARM!!! THE PROBLEM DETECTED!!!:</b>\n"
-                                        f"{ex}", parse_mode='html')
+                                        f"{ex.__traceback__}", parse_mode='html')
             database.session.rollback()
             sleep(15)
