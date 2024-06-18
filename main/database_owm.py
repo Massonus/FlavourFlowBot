@@ -1,18 +1,18 @@
+from passlib.hash import bcrypt
 from sqlalchemy import (create_engine, Column, Integer, BigInteger,
                         Sequence, Double, Text, ForeignKey,
                         String, func, Date, text, Time, DateTime)
 from sqlalchemy.orm import sessionmaker, declarative_base, exc
-from passlib.hash import bcrypt
+
 import config
 import dropbox_factory as dropbox
-from main import main_menu
 
 engine = create_engine(
-    f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_test_password}@{config.postgres_test_host}:5432"
+    f"postgresql+psycopg://{config.postgres_username}:{config.postgres_test_password}@{config.postgres_test_host}:5432"
     f"/{config.postgres_practice_database}")
 
 # engine = create_engine(
-#     f"postgresql+psycopg2://{config.postgres_username}:{config.postgres_password}@{config.postgres_host}:5432"
+#     f"postgresql+psycopg://{config.postgres_username}:{config.postgres_password}@{config.postgres_host}:5432"
 #     f"/{config.postgres_database}")
 
 Session = sessionmaker(bind=engine)
@@ -283,7 +283,6 @@ class Company(Base):
             dropbox.delete_file(message, bot, values)
         else:
             Company.delete_directly(company_id, bot, message)
-            main_menu(message)
 
     @staticmethod
     def delete_directly(company_id, bot, message):
@@ -334,7 +333,6 @@ class Product(Base):
             dropbox.delete_file(message, bot, values)
         else:
             Product.delete_directly(product.id, bot, message)
-            main_menu(message)
 
     @staticmethod
     def delete_directly(product_id, bot, message):
@@ -462,7 +460,7 @@ class Consumer(Base):
              'id': user_id})
         consumer = Consumer(**values)
         session.add(consumer)
-        change_sequence(Consumer.__tablename__, {user_id})
+        change_sequence(Consumer.__tablename__, user_id)
         session.commit()
 
         Basket.add_new(user_id)
@@ -494,7 +492,7 @@ class PendingUser(Base):
 
     @staticmethod
     def delete_pending(telegram_id):
-        pending = session.query(PendingUser).filter_by(telegram_id=telegram_id).first()
+        pending = session.query(PendingUser).filter_by(telegram_id=int(telegram_id)).first()
         session.delete(pending)
         session.commit()
 
@@ -523,4 +521,5 @@ def change_sequence(table, value):
 
 # initialize all tables
 if __name__ == '__main__':
-    Base.metadata.create_all(engine)
+    # Base.metadata.create_all(engine)
+    Base.metadata.tables['consumer'].create(bind=engine)

@@ -1,9 +1,10 @@
-import dropbox.files
 import dropbox.exceptions
-import main
+import dropbox.files
 from dropbox import DropboxOAuth2FlowNoRedirect
+
 import config
 import database_owm as database
+import run
 
 
 def dbx_init_token(message, photo_bytes, bot, values):
@@ -61,7 +62,7 @@ def upload_file(message, photo_bytes, bot, values):
         url = dbx.sharing_create_shared_link_with_settings(path).url.replace("www.dropbox.com",
                                                                              "dl.dropboxusercontent.com")
         values.update({'image_link': url})
-        main.add_item_with_dropbox_link(message, values)
+        run.add_item_with_dropbox_link(message, values)
     except (dropbox.exceptions.AuthError, AttributeError):
         print("Waiting...")
 
@@ -73,9 +74,9 @@ def delete_file(message, bot, values):
     try:
         dbx.files_delete_v2(path)
         if values.get('type').upper() == 'COMPANY':
-            database.Company.delete_directly(values.get('id'), bot, message)
+            database.Company.delete_directly(int(values.get('id')), bot, message)
         else:
-            database.Product.delete_directly(values.get('id'), bot, message)
+            database.Product.delete_directly(int(values.get('id')), bot, message)
     except AttributeError:
         print("Waiting oauth...")
     except dropbox.exceptions.ApiError as error:
