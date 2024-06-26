@@ -8,6 +8,7 @@ from aiogram.filters import Command, CommandStart
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.types import (InlineKeyboardMarkup, InlineKeyboardButton,
                            Message, CallbackQuery, ReplyKeyboardMarkup, KeyboardButton)
 import logging
@@ -28,7 +29,7 @@ async def start(message: Message):
 
     if database.Consumer.is_authenticated(message.from_user.id):
         user = database.Consumer.get_by_telegram_id(message.from_user.id)
-        await message.answer(f"Welcome. You are authorized as {user.username}!")
+        await message.answer(f"Welcome. You are authorized as {user.enter_login_password}!")
     else:
         await message.answer("Welcome. You are not authorized! You can do it below")
 
@@ -50,7 +51,7 @@ async def command_help(message: Message):
         return
 
     try:
-        username = database.Consumer.get_by_telegram_id(message.from_user.id).username
+        username = database.Consumer.get_by_telegram_id(message.from_user.id).enter_login_password
         database.Consumer.change_telegram_id(username, 0)
         await message.answer("Successfully logout")
         await main_menu(message)
@@ -61,31 +62,35 @@ async def command_help(message: Message):
 
 @dp.message(Command('image'))
 async def redirect(message: Message):
-    markup = InlineKeyboardMarkup()
-    btn1 = InlineKeyboardButton(text='Go to our site', url='http://flavourflow.eu-central-1.elasticbeanstalk.com')
-    btn2 = InlineKeyboardButton(text='Delete', callback_data='delete')
-    btn3 = InlineKeyboardButton(text='Edit', callback_data='edit')
-    markup.append(btn1)
-    markup.add(btn2, btn3)
-    await bot.send_photo(chat_id=message.chat.id,
-                   photo = 'https://dl.dropboxusercontent.com/scl/fi/3ydxuft93439s8klnjl6g/COMPANY2.jpg?rlkey=18aqwj4v50mozjjsfrcdc0pgg&dl=0',
-                   reply_markup=markup, caption="text")
+    builder = InlineKeyboardBuilder()
+
+    builder.button(text='Go to our site', url='http://flavourflow.eu-central-1.elasticbeanstalk.com')
+    builder.button(text='Delete', callback_data='delete')
+    builder.button(text='Edit', callback_data='edit')
+    builder.adjust(1, 2)
+
+    await bot.send_photo(
+        chat_id=message.chat.id,
+        photo='https://dl.dropboxusercontent.com/scl/fi/3ydxuft93439s8klnjl6g/COMPANY2.jpg?rlkey=18aqwj4v50mozjjsfrcdc0pgg&dl=0',
+        caption="text",
+        reply_markup=builder.as_markup()
+    )
 
 
 class Form(StatesGroup):
-    username = State()
+    enter_login_password = State()
     login = State()
-    email = State()
-    email1 = State()
-    password = State()
-    password1 = State()
+    enter_email = State()
+    enter_registration_password = State()
+    login_result = State()
+    enter_confirm_password = State()
     confirm_password = State()
     question = State()
     product_title = State()
     company_title = State()
 
-@dp.callback_query(lambda c: True)
-async def process_callback(callback_query: CallbackQuery):
+@dp.callback_query(lambda call: True)
+async def process_callback(callback_query: CallbackQuery, state: FSMContext):
     data = callback_query.data
     user_id = callback_query.from_user.id
     chat_id = callback_query.message.chat.id
@@ -122,13 +127,13 @@ async def process_callback(callback_query: CallbackQuery):
 
     elif data == "login":
         await bot.delete_message(chat_id, callback_query.message.message_id)
-        await Form.username.set()
+        await state.set_state(Form.enter_login_password)
         await bot.send_message(chat_id, 'Enter your username from Flavour Flow site')
 
 
     elif data == "register":
         await bot.delete_message(chat_id, callback_query.message.message_id)
-        await Form.email.set()
+        await state.set_state(Form.enter_email)
         await bot.send_message(chat_id, 'Enter your username')
 
 
@@ -212,25 +217,32 @@ async def process_callback(callback_query: CallbackQuery):
         await main_menu(callback_query.message)
 
 
-async def print_profile_info(message):
+async def print_profile_info(message: Message):
     user_profile = database.Consumer.get_by_telegram_id(message.from_user.id)
     await bot.send_message(message.chat.id, f'Flavour Flow user information:'
-                                      f'\nUsername: {user_profile.username}'
-                                      f'\nEmail: {user_profile.email}'
+                                      f'\nUsername: {user_profile.enter_login_password}'
+                                      f'\nEmail: {user_profile.enter_email}'
                                       f'\nBonuses: {user_profile.bonuses}')
     await main_menu(message)
 
 
-async def print_orders_info(message):
+async def print_orders_info(message: Message):
     user_id = database.Consumer.get_by_telegram_id(message.from_user.id).id
     orders = database.Order.get_all_by_user_id(user_id)
-    await bot.send_message(message.chat.id, f'Your orders:')
+    await message.answer('Your orders:')
     for order in orders:
-        await bot.send_message(message.chat.id, f'Company: {database.Company.get_company_by_id(order.company_id).title}'
-                                          f'\nEarned bonuses: {order.earned_bonuses}'
-                                          f'\nDate and time: {order.date}, '
-                                          f'{order.time.isoformat(timespec="minutes")}'
-                                          f'\nAddress: {order.address}')
+        company = database.Company.get_company_by_id(order.company_id).title
+        earned_bonuses = order.earned_bonuses
+        date = order.date
+        time = order.time.isoformat(timespec="minutes")
+        address = order.address
+
+        await message.answer(
+            f'Company: {company}\n'
+            f'Earned bonuses: {earned_bonuses}\n'
+            f'Date and time: {date}, {time}\n'
+            f'Address: {address}'
+        )
 
     await main_menu(message)
 
@@ -408,7 +420,7 @@ async def main_menu(message: Message):
 
     await message.answer("Main menu. Choose the option:", reply_markup=markup)
 
-async  def send_question_to_support_group(message, user_id):
+async def send_question_to_support_group(message, user_id):
     await bot.reply_to(message, "Your question was sent")
     await main_menu(message)
     database.PendingUser.add_new_pending(user_id)
@@ -423,18 +435,18 @@ async  def send_question_to_support_group(message, user_id):
     await bot.send_message(GROUP_ID,
                      f"<b>New question was taken!</b>"
                      f"\n<b>From:</b> {message.from_user.first_name} (FFlow username: "
-                     f"{database.Consumer.get_by_telegram_id(message.from_user.id).username})"
+                     f"{database.Consumer.get_by_telegram_id(message.from_user.id).enter_login_password})"
                      f"\nID: {message.chat.id}"
                      f"\n<b>Message:</b> \"{message.text}\"", reply_markup=markup, parse_mode='HTML')
 
 
-@dp.message(Form.username)
+@dp.message(Form.enter_login_password)
 async def enter_login_password(message: types.Message, state: FSMContext):
     await state.update_data(username=message.text)
-    await state.set_state(Form.password)
+    await state.set_state(Form.login_result)
     await message.reply("Enter password")
 
-@dp.message(Form.email)
+@dp.message(Form.enter_email)
 async def enter_email(message: types.Message, state: FSMContext):
     username = message.text
     await state.update_data(username=username)
@@ -442,7 +454,7 @@ async def enter_email(message: types.Message, state: FSMContext):
     # values = {'username': username}
     if not database.Consumer.is_username_already_exists(username) and re.search(r'^[a-zA-Z][a-zA-Z0-9_]*$',
                                                                                 username) is not None:
-        await Form.email1.set()
+        await state.set_state(Form.enter_registration_password)
         await message.reply("Enter email")
 
 
@@ -454,13 +466,13 @@ async def enter_email(message: types.Message, state: FSMContext):
         await message.reply("Username must start with a letter and contain only letters, numbers, and underscores")
         await main_menu(message)
 
-@dp.message(Form.email1)
+@dp.message(Form.enter_registration_password)
 async def enter_registration_password(message: types.Message, state: FSMContext):
     email = message.text
     await state.update_data(email=email)
     if not database.Consumer.is_email_already_exists(email) and re.search(r'^[^\s@]+@[^\s@]+\.[^\s@]+$',
                                                                           email) is not None:
-        await Form.password1.set()
+        await state.set_state(Form.enter_confirm_password)
         await message.reply("Enter password")
 
 
@@ -472,14 +484,14 @@ async def enter_registration_password(message: types.Message, state: FSMContext)
         await message.reply("Incorrect email")
         await main_menu(message)
 
-@dp.message(F. state == Form.password1)
+@dp.message(Form.enter_confirm_password)
 async def enter_confirm_password(message: types.Message, state: FSMContext):
     password = message.text
     await state.update_data(password=password)
     # values.update({'password': password})
     if re.search(r'^(?=.*[a-zA-Z])(?=.*\d)(?=.*[\W_]).{6,15}$', password) is not None:
         await message.reply("Confirm password")
-        await Form.confirm_password.set()
+        await state.set_state(Form.confirm_password)
 
     else:
         await bot.send_message(message.chat.id,
@@ -488,7 +500,7 @@ async def enter_confirm_password(message: types.Message, state: FSMContext):
         await main_menu(message)
 
 
-@dp.message(F.state == Form.confirm_password)
+@dp.message(Form.confirm_password)
 async def registration_result(message: types.Message, state: FSMContext):
     confirm_password = message.text
     user_data = await state.get_data()
@@ -499,16 +511,17 @@ async def registration_result(message: types.Message, state: FSMContext):
         user_data.update({'telegram_id': message.from_user.id})
         database.Consumer.add_new(user_data)
         await message.reply(
-            f"Successful registration. Welcome {database.Consumer.get_by_telegram_id(message.from_user.id).username}!")
+            f"Successful registration. Welcome " 
+        f" {database.Consumer.get_by_telegram_id(message.from_user.id).enter_login_password}!")
         await main_menu(message)
     elif password != confirm_password:
         await message.reply("Passwords are different, try again")
         await main_menu(message)
 
-    await state.finish()
+    await state.clear()
 
 
-@dp.message(F.state == Form.password)
+@dp.message(Form.login_result)
 async def login_result(message: types.Message, state: FSMContext):
     user_data = await state.get_data()
     username = user_data['username']
@@ -520,30 +533,29 @@ async def login_result(message: types.Message, state: FSMContext):
     if is_correct_username and is_correct_password:
         database.Consumer.change_telegram_id(username, message.from_user.id)
         await message.reply(f"Success authorization. Welcome "
-                            f"{database.Consumer.get_by_telegram_id(message.from_user.id).username}!")
+                            f"{database.Consumer.get_by_telegram_id(message.from_user.id).enter_login_password}!")
         await main_menu(message)
     else:
         await message.reply("Username or password is incorrect")
         await main_menu(message)
 
-    await state.finish()
 
-async def send_answer(message, chat_id, message_id, user_id, question_message_id):
+async def send_answer(message: Message, chat_id: int, message_id: int, user_id: int, question_message_id: int):
     await bot.send_message(chat_id, f'Your have got an answer: \n<b>{message.text}</b>', parse_mode='HTML',
-                     reply_to_message_id=question_message_id)
-    await bot.reply_to(message, 'Your answer was sent')
+                           reply_to_message_id=question_message_id)
+    await message.reply('Your answer was sent')
     database.PendingUser.delete_pending(user_id)
     await bot.delete_message(GROUP_ID, message_id)
 
 
-async def answer_message(callback):
+async def answer_message(callback: CallbackQuery):
     text_split = callback.data.split("-")
     chat_id = text_split[0]
     user_id = text_split[1]
     question_message_id = text_split[2]
     message_id = callback.message.message_id
     await bot.send_message(callback.message.chat.id, "Enter your answer: ")
-    await bot.register_next_step_handler(callback.message, send_answer, chat_id, message_id, user_id, question_message_id)
+    dp.message.register(send_answer, F.chat.id == callback.message.chat.id, chat_id, message_id, user_id, question_message_id)
 
 
 async def ignore_message(callback):
@@ -557,111 +569,113 @@ async def ignore_message(callback):
     database.PendingUser.delete_pending(user_id)
 
 
-async def companies_catalog(callback):
+async def companies_catalog(callback: CallbackQuery):
     page = int(callback.data.split('-')[0])
 
     # Number of rows and data for 1 page
     company, count = database.Company.get_for_catalog(page, skip_size=1)  # skip_size - display by one element
 
-    markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton(text='Return to main menu', callback_data='main menu'))
-
-    markup.add(
-        types.InlineKeyboardButton(text='Products of this company', callback_data=f"1-{company.id}-{page}-products"))
+    buttons = [
+        [InlineKeyboardButton(text='Return to main menu', callback_data='main menu')],
+        [InlineKeyboardButton(text='Products of this company', callback_data=f"1-{company.id}-{page}-products")]
+    ]
 
     if database.Consumer.is_admin(callback.from_user.id):
-        add_btn = types.InlineKeyboardButton('Add item', callback_data='add company')
-        delete_btn = types.InlineKeyboardButton('Delete item', callback_data=f'{company.id}-delete-company')
-
-        markup.add(add_btn)
-        markup.add(delete_btn)
+        buttons.append([InlineKeyboardButton('Add item', callback_data='add company')])
+        buttons.append([InlineKeyboardButton('Delete item', callback_data=f'{company.id}-delete-company')])
 
     if page == 1:
-        markup.add(types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '),
-                   types.InlineKeyboardButton(text=f'Forward --->', callback_data=f"{page + 1}-companies"))
-
+        buttons.append([
+            InlineKeyboardButton(text=f'{page}/{count}', callback_data=' '),
+            InlineKeyboardButton(text='Forward --->', callback_data=f"{page + 1}-companies")
+        ])
     elif page == count:
-        markup.add(types.InlineKeyboardButton(text=f'<--- Back', callback_data=f"{page - 1}-companies"),
-                   types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '))
+        buttons.append([
+            InlineKeyboardButton(text='<--- Back', callback_data=f"{page - 1}-companies"),
+            InlineKeyboardButton(text=f'{page}/{count}', callback_data=' ')
+        ])
     else:
-        markup.add(types.InlineKeyboardButton(text=f'<--- Back', callback_data=f"{page - 1}-companies"),
-                   types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '),
-                   types.InlineKeyboardButton(text=f'Forward --->', callback_data=f"{page + 1}-companies"))
+        buttons.append([
+            InlineKeyboardButton(text='<--- Back', callback_data=f"{page - 1}-companies"),
+            InlineKeyboardButton(text=f'{page}/{count}', callback_data=' '),
+            InlineKeyboardButton(text='Forward --->', callback_data=f"{page + 1}-companies")
+        ])
+
+    markup = InlineKeyboardMarkup(inline_keyboard=buttons)
 
     await bot.delete_message(callback.message.chat.id, callback.message.message_id)
     await bot.send_photo(callback.message.chat.id, photo=company.image_link, caption=f'<b>{company.title}</b>\n\n'
-                                                                               f'<b>Description:</b> '
-                                                                               f'<i>{company.description}</i>\n',
-                   parse_mode="HTML", reply_markup=markup)
+                                                                                     f'<b>Description:</b> '
+                                                                                     f'<i>{company.description}</i>\n',
+                         parse_mode="HTML", reply_markup=markup)
 
 
-async def products_catalog(callback):
+async def products_catalog(callback: CallbackQuery):
     text_split = callback.data.split('-')
     page = int(text_split[0])
     company_id = int(text_split[1])
     company_page = int(text_split[2])
+
     try:
         # Number of rows and data for 1 page
         product, count = database.Product.get_for_catalog(company_id, page, skip_size=1)
 
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton(text='Return to main menu', callback_data='main menu'))
-        markup.add(types.InlineKeyboardButton(text='Bask to companies', callback_data=f"{company_page}-companies"))
+        buttons = [
+            [InlineKeyboardButton(text='Return to main menu', callback_data='main menu')],
+            [InlineKeyboardButton(text='Back to companies', callback_data=f"{company_page}-companies")]
+        ]
 
         if database.Consumer.is_admin(callback.from_user.id):
-            add_btn = types.InlineKeyboardButton('Add item', callback_data=f'{company_id}-add product')
-            delete_btn = types.InlineKeyboardButton('Delete item', callback_data=f'{product.id}-delete-product')
-
-            markup.add(add_btn)
-            markup.add(delete_btn)
+            buttons.append([InlineKeyboardButton('Add item', callback_data=f'{company_id}-add product')])
+            buttons.append([InlineKeyboardButton('Delete item', callback_data=f'{product.id}-delete-product')])
 
         if database.Consumer.is_authenticated(callback.from_user.id):
-            add_to_basket = types.InlineKeyboardButton('Add to basket', callback_data=f'{product.id}-add-basket')
-            add_to_wishlist = types.InlineKeyboardButton('Add to wishlist', callback_data=f'{product.id}-add-wish')
-            markup.row(add_to_basket, add_to_wishlist)
+            buttons.append([
+                InlineKeyboardButton('Add to basket', callback_data=f'{product.id}-add-basket'),
+                InlineKeyboardButton('Add to wishlist', callback_data=f'{product.id}-add-wish')
+            ])
 
         if page == 1:
-            markup.add(types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '),
-                       types.InlineKeyboardButton(text=f'Forward --->',
-                                                  callback_data=f"{page + 1}-{company_id}-{company_page}-products"))
-
+            buttons.append([
+                InlineKeyboardButton(text=f'{page}/{count}', callback_data=' '),
+                InlineKeyboardButton(text='Forward --->', callback_data=f"{page + 1}-{company_id}-{company_page}-products")
+            ])
         elif page == count:
-            markup.add(
-                types.InlineKeyboardButton(text=f'<--- Back',
-                                           callback_data=f"{page - 1}-{company_id}-{company_page}-products"),
-                types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '))
+            buttons.append([
+                InlineKeyboardButton(text='<--- Back', callback_data=f"{page - 1}-{company_id}-{company_page}-products"),
+                InlineKeyboardButton(text=f'{page}/{count}', callback_data=' ')
+            ])
         else:
-            markup.add(
-                types.InlineKeyboardButton(text=f'<--- Back',
-                                           callback_data=f"{page - 1}-{company_id}-{company_page}-products"),
-                types.InlineKeyboardButton(text=f'{page}/{count}', callback_data=f' '),
-                types.InlineKeyboardButton(text=f'Forward --->',
-                                           callback_data=f"{page + 1}-{company_id}-{company_page}-products"))
+            buttons.append([
+                InlineKeyboardButton(text='<--- Back', callback_data=f"{page - 1}-{company_id}-{company_page}-products"),
+                InlineKeyboardButton(text=f'{page}/{count}', callback_data=' '),
+                InlineKeyboardButton(text='Forward --->', callback_data=f"{page + 1}-{company_id}-{company_page}-products")
+            ])
+
+        markup = InlineKeyboardMarkup(inline_keyboard=buttons)
 
         await bot.delete_message(callback.message.chat.id, callback.message.message_id)
         await bot.send_photo(callback.message.chat.id, photo=product.image_link, caption=f'<b>{product.title}</b>\n\n'
-                                                                                   f'<b>Description:</b> '
-                                                                                   f'<i>{product.description}</i>\n'
-                                                                                   f'<b>Composition:</b> '
-                                                                                   f'<i>{product.composition}</i>\n',
-                       parse_mode="HTML", reply_markup=markup)
+                                                                                         f'<b>Description:</b> '
+                                                                                         f'<i>{product.description}</i>\n'
+                                                                                         f'<b>Composition:</b> '
+                                                                                         f'<i>{product.composition}</i>\n',
+                             parse_mode="HTML", reply_markup=markup)
     except AttributeError:
         if database.Consumer.is_admin(callback.from_user.id):
-            markup = types.InlineKeyboardMarkup()
-            add_btn = types.InlineKeyboardButton('Add item', callback_data=f'{company_id}-add product')
-            companies_btn = types.InlineKeyboardButton('Return to companies', callback_data='1-companies')
-            markup.add(add_btn)
-            markup.add(companies_btn)
+            buttons = [
+                [InlineKeyboardButton('Add item', callback_data=f'{company_id}-add product')],
+                [InlineKeyboardButton('Return to companies', callback_data='1-companies')]
+            ]
+            markup = InlineKeyboardMarkup(inline_keyboard=buttons)
             await bot.send_message(callback.message.chat.id,
-                             "The product list of this company is empty or not enough. But you can add a product",
-                             reply_markup=markup)
+                                   "The product list of this company is empty or not enough. But you can add a product",
+                                   reply_markup=markup)
         else:
             await bot.send_message(callback.message.chat.id,
-                             "The product list of this company is empty or not enough. "
-                             "Wait until administrator add products")
-            callback.message.from_user.id = callback.from_user.id
+                                   "The product list of this company is empty or not enough. "
+                                   "Wait until administrator add products")
             await main_menu(callback.message)
-
 
 async def send_alarm(bot: Bot, admin_id: int, message: str):
     try:
