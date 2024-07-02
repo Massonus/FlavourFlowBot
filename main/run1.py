@@ -2,7 +2,7 @@ import re
 from time import sleep
 import traceback
 import asyncio
-from aiogram import Bot, Dispatcher, types, F
+from aiogram import Router, Bot, Dispatcher, types, F
 # from aiogram.utils import executor
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -12,16 +12,19 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.types import (InlineKeyboardMarkup, InlineKeyboardButton,
                            Message, CallbackQuery, ReplyKeyboardMarkup, KeyboardButton)
 import logging
-logging.basicConfig(level=logging.INFO)
 import database_owm as database
 import dropbox_factory as dropbox
 from config import GROUP_ID, TG_TOKEN, ADMIN_ID, ADMIN2_ID
 
+logging.basicConfig(level=logging.INFO)
+
 bot = Bot(token=TG_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
+router = Router()
+dp.include_router(router)
 
 
-@dp.message(CommandStart())
+@router.message(CommandStart())
 async def start(message: Message):
     if message.chat.type != 'private':
         await message.answer("I don't work in groups")
@@ -36,7 +39,7 @@ async def start(message: Message):
     await main_menu(message)
 
 
-@dp.message(Command('menu'))
+@router.message(Command('menu'))
 async def start(message: Message):
     if message.chat.type != 'private':
         await message.answer("I don't work in groups")
@@ -44,7 +47,7 @@ async def start(message: Message):
     await main_menu(message)
 
 
-@dp.message(Command('logout'))
+@router.message(Command('logout'))
 async def command_help(message: Message):
     if message.chat.type != 'private':
         await message.answer("I don't work in groups")
@@ -60,7 +63,7 @@ async def command_help(message: Message):
         await main_menu(message)
 
 
-@dp.message(Command('image'))
+@router.message(Command('image'))
 async def redirect(message: Message):
     builder = InlineKeyboardBuilder()
 
@@ -88,8 +91,16 @@ class Form(StatesGroup):
     question = State()
     product_title = State()
     company_title = State()
+    product_description = State()
+    product_composition = State()
+    product_price = State()
+    image_link = State()
+    upload_img = State()
+    add_item = State()
+    company_description = State()
 
-@dp.callback_query(lambda call: True)
+
+@router.callback_query(lambda call: True)
 async def process_callback(callback_query: CallbackQuery, state: FSMContext):
     data = callback_query.data
     user_id = callback_query.from_user.id
@@ -130,28 +141,26 @@ async def process_callback(callback_query: CallbackQuery, state: FSMContext):
         await state.set_state(Form.enter_login_password)
         await bot.send_message(chat_id, 'Enter your username from Flavour Flow site')
 
-
     elif data == "register":
         await bot.delete_message(chat_id, callback_query.message.message_id)
         await state.set_state(Form.enter_email)
         await bot.send_message(chat_id, 'Enter your username')
 
-
     elif data == "help":
         if not database.PendingUser.is_pending(user_id):
             await bot.send_message(chat_id, 'Enter your question')
-            await Form.question.set()
+            await state.set_state(Form.question)
         else:
             await bot.send_message(chat_id, 'You have already sent a message, please wait an answer')
 
-    elif "add product" in data:
+    if "add product" in data:
         company_id = int(data.split('-')[0])
         await bot.delete_message(chat_id, callback_query.message.message_id)
-        markup = InlineKeyboardMarkup()
-        meal_btn = InlineKeyboardButton(text='MEAL', callback_data=f'{company_id}-meal')
-        drink_btn = InlineKeyboardButton(text='DRINK', callback_data=f'{company_id}-drink')
-        markup.row(meal_btn, drink_btn)
-        await bot.send_message(chat_id, 'Choose product category', reply_markup=markup)
+        markup = InlineKeyboardBuilder()
+        markup.button(text='MEAL', callback_data=f'{company_id}-meal')
+        markup.button(text='DRINK', callback_data=f'{company_id}-drink')
+        markup.adjust(1, 1)
+        await bot.send_message(chat_id, 'Choose product category', reply_markup=markup.as_markup())
 
     elif "add company" in data:
         await bot.delete_message(chat_id, callback_query.message.message_id)
@@ -172,7 +181,9 @@ async def process_callback(callback_query: CallbackQuery, state: FSMContext):
             product_category = data.split('-')[0]
             company_id = int(data.split('-')[1])
             values = {'type': 'PRODUCT', 'product_category': product_category, 'image_way': 'DROPBOX', 'company_id': company_id}
-            await enter_product_title(callback_query.message, values)
+            await state.update_data(values=values)
+            await state.set_state(Form.product_title)
+            await enter_product_title(callback_query.message, state)
         except ValueError:
             await choose_kitchen_category(callback_query.message, 'DROPBOX')
 
@@ -181,7 +192,9 @@ async def process_callback(callback_query: CallbackQuery, state: FSMContext):
             company_id = int(data.split('-')[1])
             product_category = data.split('-')[0]
             values = {'type': 'PRODUCT', 'product_category': product_category, 'image_way': 'LINK', 'company_id': company_id}
-            await enter_product_title(callback_query.message, values)
+            await state.update_data(values=values)
+            await state.set_state(Form.product_title)
+            await enter_product_title(callback_query.message, state)
         except ValueError:
             await choose_kitchen_category(callback_query.message, 'LINK')
 
@@ -194,6 +207,7 @@ async def process_callback(callback_query: CallbackQuery, state: FSMContext):
         category_id = int(data.split('-')[0])
         country_id = int(data.split('-')[1])
         image_way = data.split('-')[2]
+        await state.set_state(Form.company_title)
         await enter_company_title(callback_query.message, category_id, country_id, image_way)
 
     elif "delete-product" in data:
@@ -247,24 +261,25 @@ async def print_orders_info(message: Message):
     await main_menu(message)
 
 
-async def confirm_delete_product(message, product_id):
+async def confirm_delete_product(message: Message, product_id: int):
     await bot.delete_message(message.chat.id, message.message_id)
-    markup = types.InlineKeyboardMarkup()
-    dbx_btn = types.InlineKeyboardButton(text='✅', callback_data=f'{product_id}-conf-del-prod')
-    link_btn = types.InlineKeyboardButton(text='❌', callback_data=f'deny-delete')
-    markup.row(dbx_btn, link_btn)
-    await bot.send_message(message.chat.id, 'Do you really want to delete this product?', reply_markup=markup)
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(text='✅', callback_data=f'{product_id}-conf-del-prod'),
+        InlineKeyboardButton(text='❌', callback_data='deny-delete')
+    )
+    await bot.send_message(message.chat.id, 'Do you really want to delete this product?',
+                           reply_markup=builder.as_markup())
 
 
 async def confirm_delete_company(message, company_id):
     await bot.delete_message(message.chat.id, message.message_id)
-    markup = types.InlineKeyboardMarkup()
-    dbx_btn = types.InlineKeyboardButton(text='✅', callback_data=f'{company_id}-conf-del-comp')
-    link_btn = types.InlineKeyboardButton(text='❌', callback_data=f'deny-delete')
-    markup.row(dbx_btn, link_btn)
-    await bot.send_message(message.chat.id,
-                     'Do you really want to delete this company? All products inside will be deleted too',
-                     reply_markup=markup)
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(text='✅', callback_data=f'{company_id}-conf-del-comp'),
+        InlineKeyboardButton(text='❌', callback_data='deny-delete')
+    )
+    await bot.send_message(message.chat.id, 'Do you really want to delete this company? All products inside will be deleted too', reply_markup=builder.as_markup())
 
 
 async def delete_product(message, product_id):
@@ -280,108 +295,128 @@ async def delete_company(message, company_id):
 
 
 async def image_question(message, product_category=None, company_id=None):
-    markup = types.InlineKeyboardMarkup()
-    dbx_btn = types.InlineKeyboardButton(text='DROPBOX', callback_data=f'{product_category}-{company_id}-dropbox')
-    link_btn = types.InlineKeyboardButton(text='LINK', callback_data=f'{product_category}-{company_id}-link')
-    markup.row(dbx_btn, link_btn)
+    builder = InlineKeyboardBuilder()
+    builder.button(text='DROPBOX', callback_data=f'{product_category}-{company_id}-dropbox')
+    builder.button(text='LINK', callback_data=f'{product_category}-{company_id}-link')
+    markup = builder.as_markup()
+
     await bot.send_message(message.chat.id, 'You will upload image from your PC or use link', reply_markup=markup)
 
 
-async def enter_product_title(message, values):
-    await bot.delete_message(message.chat.id, message.message_id)
-    await bot.send_message(message.chat.id, 'Enter product title:')
-    await bot.register_next_step_handler(message, enter_product_description, values)
+@router.message(Form.product_title)
+async def enter_product_title(message: Message, state: FSMContext):
+    data = await state.get_data()
+    values = data.get('values', {})
+    await state.update_data(title=message.text)
+    await state.set_state(Form.product_description)
+    await message.reply('Enter product description:')
 
 
-async def choose_kitchen_category(message, image_way):
+async def choose_kitchen_category(message: Message, image_way):
     await bot.delete_message(message.chat.id, message.message_id)
     categories = database.Kitchen.get_all()
-    markup = types.InlineKeyboardMarkup()
+    builder = InlineKeyboardBuilder()
     for category in categories:
-        category_btn = types.InlineKeyboardButton(text=category.title, callback_data=f'{category.id}-{image_way}-category')
-        markup.add(category_btn)
+        builder.button(text=category.title, callback_data=f'{category.id}-{image_way}-category')
+    markup = builder.as_markup()
     await bot.send_message(message.chat.id, 'Choose company category:', reply_markup=markup)
 
 
 async def choose_company_country(message, category_id, image_way):
     await bot.delete_message(message.chat.id, message.message_id)
     countries = database.Country.get_all()
-    markup = types.InlineKeyboardMarkup()
+    builder = InlineKeyboardBuilder()
     for country in countries:
-        category_btn = types.InlineKeyboardButton(text=country.title,
-                                                  callback_data=f'{category_id}-{country.id}-{image_way}-country')
-        markup.add(category_btn)
-    await bot.send_message(message.chat.id, 'Choose company category:', reply_markup=markup)
+        builder.add(InlineKeyboardButton(text=country.title, callback_data=f'{category_id}-{country.id}-{image_way}-country'))
+    await bot.send_message(message.chat.id, 'Choose company country:', reply_markup=builder.as_markup())
 
 
-async def enter_company_title(message, country_id, category_id, image_way):
+@router.message(Form.company_title)
+async def enter_company_title(message, country_id, category_id, image_way, state: FSMContext):
     values = {'type': 'COMPANY', 'image_way': image_way, 'country_id': country_id, 'category_id': category_id}
+    await state.update_data(values=values)
     await bot.delete_message(message.chat.id, message.message_id)
-    await bot.send_message(message.chat.id, 'Enter company title:')
-    await bot.register_next_step_handler(message, enter_company_description, values)
+    await message.reply('Enter company title:')
+    await state.set_state(Form.company_description)
 
 
-async def enter_company_description(message, values):
-    values.update({'title': message.text})
+@router.message(Form.company_description)
+async def enter_company_description(message: Message, state: FSMContext):
+    await state.update_data(description=message.text)
     await bot.send_message(message.chat.id, 'Enter company description:')
-    await bot.register_next_step_handler(message, send_image_or_link, values)
+    await state.set_state(Form.image_link)
 
 
-async def enter_product_description(message, values):
-    values.update({'title': message.text})
-    await bot.send_message(message.chat.id, 'Enter product description:')
-    await bot.register_next_step_handler(message, enter_product_composition, values)
+@router.message(Form.product_description)
+async def enter_product_description(message: Message, state: FSMContext):
+    await state.update_data(description=message.text)
+    await state.set_state(Form.product_composition)
+    await message.reply('Enter product composition:')
 
 
-async def enter_product_composition(message, values):
-    values.update({'description': message.text})
-    await bot.send_message(message.chat.id, 'Enter product composition:')
-    await bot.register_next_step_handler(message, enter_product_price, values)
+@router.message(Form.product_composition)
+async def enter_product_composition(message: Message, state: FSMContext):
+    await state.update_data(composition=message.text)
+    await state.set_state(Form.product_price)
+    await message.reply('Enter product price (use only numbers):')
 
 
-async def enter_product_price(message, values):
-    values.update({'composition': message.text})
-    await  bot.send_message(message.chat.id, 'Enter product price (use only numbers):')
-    await  bot.register_next_step_handler(message, send_image_or_link, values)
+@router.message(Form.product_price)
+async def enter_product_price(message: types.Message, state: FSMContext):
+    await state.update_data(price=message.text)
+    await state.set_state(Form.image_link)
+    await message.reply('Enter product composition:')
 
 
-async def send_image_or_link(message, values):
+@router.message(Form.image_link)
+async def send_image_or_link(message: Message, values: dict, state: FSMContext):
     if values.get('type') == 'COMPANY':
         values.update({'description': message.text})
     else:
         try:
             values.update({'price': float(message.text)})
         except ValueError:
-            await bot.send_message(message.chat.id, 'I told you to use only numbers. Try again')
-            main_menu(message)
+            await message.answer('I told you to use only numbers. Try again')
+            await main_menu(message)
             return False
 
     if values.get('image_way') == 'DROPBOX':
-        await bot.send_message(message.chat.id, 'Send here your image')
-        await bot.register_next_step_handler(message, upload_image, values)
+        await message.answer('Send here your image')
+        await state.set_state(Form.upload_img)
+        await state.update_data(values=values)
     elif values.get('image_way') == 'LINK':
-        await bot.send_message(message.chat.id, 'Enter your link')
-        await bot.register_next_step_handler(message, add_item_with_link, values)
+        await message.answer('Enter your link')
+        await state.set_state(Form.add_item)
+        await state.update_data(values=values)
 
 
-async def upload_image(message, values):
+@router.message(Form.upload_img)
+async def upload_image(message: Message, state: FSMContext):
+    data = await state.get_data()
+    values = data.get('values', {})
     try:
-        photo_id = bot.get_file(message.photo[len(message.photo) - 1].file_id).file_id
-        photo_file = bot.get_file(photo_id)
-        photo_bytes = bot.download_file(photo_file.file_path)
+        photo_id = message.photo[-1].file_id
+        photo_file = await bot.get_file(photo_id)
+        photo_bytes = await bot.download_file(photo_file.file_path)
         dropbox.upload_file(message, photo_bytes, bot, values)
     except TypeError:
-        await bot.send_message(message.chat.id, 'It is not an image')
+        await message.answer('It is not an image')
         await main_menu(message)
 
 
-async def add_item_with_link(message, values):
+@router.message(Form.add_item)
+async def add_item_with_link(message: Message, state: FSMContext):
+    data = await state.get_data()
+    values = data.get('values', {})
     item_type = values.get('type').lower()
     values.update({'image_link': message.text})
     values.pop('type')
     values.pop('image_way')
-    database.Company.add_new(values) if item_type == "company" else database.Product.add_new(values)
-    await bot.send_message(message.chat.id, 'Item added')
+    if item_type == "company":
+        database.Company.add_new(values)
+    else:
+        database.Product.add_new(values)
+    await message.answer('Item added')
     await main_menu(message)
 
 
@@ -420,33 +455,35 @@ async def main_menu(message: Message):
 
     await message.answer("Main menu. Choose the option:", reply_markup=markup)
 
-async def send_question_to_support_group(message, user_id):
-    await bot.reply_to(message, "Your question was sent")
+
+@router.message(Form.question)
+async def send_question_to_support_group(message: Message, state: FSMContext):
+    user_id = message.from_user.id
+    await message.reply("Your question was sent")
     await main_menu(message)
     database.PendingUser.add_new_pending(user_id)
-    markup = types.InlineKeyboardMarkup()
-    btn1 = types.InlineKeyboardButton('💬 Answer',
-                                      callback_data=f'{message.chat.id}-{message.from_user.id}-{message.message_id}'
-                                                    f'-answer')
-    btn2 = types.InlineKeyboardButton('❌ Ignore',
-                                      callback_data=f'{message.chat.id}-{message.from_user.id}-{message.message_id}'
-                                                    f'-ignore')
-    markup.row(btn1, btn2)
+    markup = InlineKeyboardBuilder()
+    markup.button(text='💬 Answer', callback_data=f"action:answer:{user_id}")
+    markup.button(text='❌ Ignore', callback_data=f"action:ignore:{user_id}")
+    markup.adjust(1, 1)
+
     await bot.send_message(GROUP_ID,
-                     f"<b>New question was taken!</b>"
-                     f"\n<b>From:</b> {message.from_user.first_name} (FFlow username: "
-                     f"{database.Consumer.get_by_telegram_id(message.from_user.id).enter_login_password})"
-                     f"\nID: {message.chat.id}"
-                     f"\n<b>Message:</b> \"{message.text}\"", reply_markup=markup, parse_mode='HTML')
+                           f"<b>New question was taken!</b>"
+                           f"\n<b>From:</b> {message.from_user.first_name} (FFlow username: "
+                           f"{database.Consumer.get_by_telegram_id(message.from_user.id).enter_login_password})"
+                           f"\nID: {message.chat.id}"
+                           f"\n<b>Message:</b> \"{message.text}\"", reply_markup=markup.as_markup(), parse_mode='HTML')
+    # await state.clear()
 
 
-@dp.message(Form.enter_login_password)
+@router.message(Form.enter_login_password)
 async def enter_login_password(message: types.Message, state: FSMContext):
     await state.update_data(username=message.text)
     await state.set_state(Form.login_result)
     await message.reply("Enter password")
 
-@dp.message(Form.enter_email)
+
+@router.message(Form.enter_email)
 async def enter_email(message: types.Message, state: FSMContext):
     username = message.text
     await state.update_data(username=username)
@@ -457,7 +494,6 @@ async def enter_email(message: types.Message, state: FSMContext):
         await state.set_state(Form.enter_registration_password)
         await message.reply("Enter email")
 
-
     elif database.Consumer.is_username_already_exists(username):
         await bot.send_message(message.chat.id, "This username is already in use")
         await main_menu(message)
@@ -466,7 +502,8 @@ async def enter_email(message: types.Message, state: FSMContext):
         await message.reply("Username must start with a letter and contain only letters, numbers, and underscores")
         await main_menu(message)
 
-@dp.message(Form.enter_registration_password)
+
+@router.message(Form.enter_registration_password)
 async def enter_registration_password(message: types.Message, state: FSMContext):
     email = message.text
     await state.update_data(email=email)
@@ -474,7 +511,6 @@ async def enter_registration_password(message: types.Message, state: FSMContext)
                                                                           email) is not None:
         await state.set_state(Form.enter_confirm_password)
         await message.reply("Enter password")
-
 
     elif database.Consumer.is_email_already_exists(email):
         await message.reply("This email is already in use")
@@ -484,7 +520,8 @@ async def enter_registration_password(message: types.Message, state: FSMContext)
         await message.reply("Incorrect email")
         await main_menu(message)
 
-@dp.message(Form.enter_confirm_password)
+
+@router.message(Form.enter_confirm_password)
 async def enter_confirm_password(message: types.Message, state: FSMContext):
     password = message.text
     await state.update_data(password=password)
@@ -500,7 +537,7 @@ async def enter_confirm_password(message: types.Message, state: FSMContext):
         await main_menu(message)
 
 
-@dp.message(Form.confirm_password)
+@router.message(Form.confirm_password)
 async def registration_result(message: types.Message, state: FSMContext):
     confirm_password = message.text
     user_data = await state.get_data()
@@ -521,7 +558,7 @@ async def registration_result(message: types.Message, state: FSMContext):
     await state.clear()
 
 
-@dp.message(Form.login_result)
+@router.message(Form.login_result)
 async def login_result(message: types.Message, state: FSMContext):
     user_data = await state.get_data()
     username = user_data['username']
@@ -581,8 +618,8 @@ async def companies_catalog(callback: CallbackQuery):
     ]
 
     if database.Consumer.is_admin(callback.from_user.id):
-        buttons.append([InlineKeyboardButton('Add item', callback_data='add company')])
-        buttons.append([InlineKeyboardButton('Delete item', callback_data=f'{company.id}-delete-company')])
+        buttons.append([InlineKeyboardButton(text='Add item', callback_data='add company')])
+        buttons.append([InlineKeyboardButton(text='Delete item', callback_data=f'{company.id}-delete-company')])
 
     if page == 1:
         buttons.append([
@@ -626,13 +663,13 @@ async def products_catalog(callback: CallbackQuery):
         ]
 
         if database.Consumer.is_admin(callback.from_user.id):
-            buttons.append([InlineKeyboardButton('Add item', callback_data=f'{company_id}-add product')])
-            buttons.append([InlineKeyboardButton('Delete item', callback_data=f'{product.id}-delete-product')])
+            buttons.append([InlineKeyboardButton(text='Add item', callback_data=f'{company_id}-add product')])
+            buttons.append([InlineKeyboardButton(text='Delete item', callback_data=f'{product.id}-delete-product')])
 
         if database.Consumer.is_authenticated(callback.from_user.id):
             buttons.append([
-                InlineKeyboardButton('Add to basket', callback_data=f'{product.id}-add-basket'),
-                InlineKeyboardButton('Add to wishlist', callback_data=f'{product.id}-add-wish')
+                InlineKeyboardButton(text='Add to basket', callback_data=f'{product.id}-add-basket'),
+                InlineKeyboardButton(text='Add to wishlist', callback_data=f'{product.id}-add-wish')
             ])
 
         if page == 1:
@@ -664,8 +701,8 @@ async def products_catalog(callback: CallbackQuery):
     except AttributeError:
         if database.Consumer.is_admin(callback.from_user.id):
             buttons = [
-                [InlineKeyboardButton('Add item', callback_data=f'{company_id}-add product')],
-                [InlineKeyboardButton('Return to companies', callback_data='1-companies')]
+                [InlineKeyboardButton(text='Add item', callback_data=f'{company_id}-add product')],
+                [InlineKeyboardButton(text='Return to companies', callback_data='1-companies')]
             ]
             markup = InlineKeyboardMarkup(inline_keyboard=buttons)
             await bot.send_message(callback.message.chat.id,
@@ -676,6 +713,7 @@ async def products_catalog(callback: CallbackQuery):
                                    "The product list of this company is empty or not enough. "
                                    "Wait until administrator add products")
             await main_menu(callback.message)
+
 
 async def send_alarm(bot: Bot, admin_id: int, message: str):
     try:
