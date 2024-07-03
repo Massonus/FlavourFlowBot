@@ -98,6 +98,7 @@ class Form(StatesGroup):
     upload_img = State()
     add_item = State()
     company_description = State()
+    answer = State()
 
 
 @router.callback_query(lambda call: True)
@@ -107,7 +108,7 @@ async def process_callback(callback_query: CallbackQuery, state: FSMContext):
     chat_id = callback_query.message.chat.id
 
     if "answer" in data:
-        await answer_message(callback_query)
+        await answer_message(callback_query, state)
 
     elif "ignore" in data:
         await ignore_message(callback_query)
@@ -580,32 +581,43 @@ async def login_result(message: types.Message, state: FSMContext):
         await main_menu(message, message.from_user.id)
 
 
-async def send_answer(message: Message, chat_id: int, message_id: int, user_id: int, question_message_id: int):
-    await bot.send_message(chat_id, f'Your have got an answer: \n<b>{message.text}</b>', parse_mode='HTML',
+@router.message(Form.answer)
+async def send_answer(message: Message, state: FSMContext):
+    data = await state.get_data()
+    chat_id = data.get('chat_id')
+    user_id = data.get('user_id')
+    question_message_id = data.get('question_message_id')
+    message_id = data.get('message_id')
+
+    await bot.send_message(chat_id, f'You have received an answer:\n<b>{message.text}</b>', parse_mode='HTML',
                            reply_to_message_id=question_message_id)
     await message.reply('Your answer was sent')
     database.PendingUser.delete_pending(user_id)
     await bot.delete_message(GROUP_ID, message_id)
+    await state.clear()
 
 
-async def answer_message(callback: CallbackQuery):
+async def answer_message(callback: CallbackQuery, state: FSMContext):
     text_split = callback.data.split(":")
-    chat_id = text_split[0]
-    user_id = text_split[1]
-    question_message_id = text_split[2]
+    chat_id = int(text_split[0])
+    user_id = int(text_split[1])
+    question_message_id = int(text_split[2])
     message_id = callback.message.message_id
     await bot.send_message(callback.message.chat.id, "Enter your answer: ")
-    dp.message.register(send_answer, F.chat.id == callback.message, callback.message, chat_id, message_id, user_id, question_message_id)
+    # dp.message.register(send_answer, F.chat.id == callback.message, callback.message, chat_id, message_id, user_id, question_message_id)
+    await state.set_state(Form.answer)
+    await state.update_data(chat_id=chat_id, user_id=user_id, question_message_id=question_message_id,
+                            message_id=message_id)
 
 
-async def ignore_message(callback):
+async def ignore_message(callback: CallbackQuery):
     text_split = callback.data.split(":")
-    chat_id = text_split[0]
-    user_id = text_split[1]
-    question_message_id = text_split[2]
+    chat_id = int(text_split[0])
+    user_id = int(text_split[1])
+    question_message_id = int(text_split[2])
     message_id = callback.message.message_id
     await bot.send_message(chat_id, "Unfortunately, your question was denied", reply_to_message_id=question_message_id)
-    await bot.delete_message(GROUP_ID, message_id)
+    await bot.delete_message(chat_id, message_id)
     database.PendingUser.delete_pending(user_id)
 
 
