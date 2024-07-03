@@ -127,10 +127,10 @@ async def process_callback(callback_query: CallbackQuery, state: FSMContext):
         await bot.send_message(chat_id, database.WishObject.add_new(product_id, user_id))
 
     elif data == "profile":
-        await print_profile_info(callback_query.message)
+        await print_profile_info(callback_query.message, callback_query.from_user.id)
 
     elif data == "orders":
-        await print_orders_info(callback_query.message)
+        await print_orders_info(callback_query.message, callback_query.from_user.id)
 
     elif data == "main menu":
         await bot.delete_message(chat_id, callback_query.message.message_id)
@@ -231,16 +231,16 @@ async def process_callback(callback_query: CallbackQuery, state: FSMContext):
         await main_menu(callback_query.message, callback_query.from_user.id)
 
 
-async def print_profile_info(message: Message):
+async def print_profile_info(message: Message, telegram_id):
     user_profile = database.Consumer.get_by_telegram_id(message.from_user.id)
     await bot.send_message(message.chat.id, f'Flavour Flow user information:'
                                       f'\nUsername: {user_profile.username}'
                                       f'\nEmail: {user_profile.email}'
                                       f'\nBonuses: {user_profile.bonuses}')
-    await main_menu(message, message.from_user.id)
+    await main_menu(message, telegram_id)
 
 
-async def print_orders_info(message: Message):
+async def print_orders_info(message: Message, telegram_id):
     user_id = database.Consumer.get_by_telegram_id(message.from_user.id).id
     orders = database.Order.get_all_by_user_id(user_id)
     await message.answer('Your orders:')
@@ -258,7 +258,7 @@ async def print_orders_info(message: Message):
             f'Address: {address}'
         )
 
-    await main_menu(message, message.from_user.id)
+    await main_menu(message, telegram_id)
 
 
 async def confirm_delete_product(message: Message, product_id: int):
