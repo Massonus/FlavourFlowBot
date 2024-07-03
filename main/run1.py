@@ -232,7 +232,7 @@ async def process_callback(callback_query: CallbackQuery, state: FSMContext):
 
 
 async def print_profile_info(message: Message, telegram_id):
-    user_profile = database.Consumer.get_by_telegram_id(message.from_user.id)
+    user_profile = database.Consumer.get_by_telegram_id(telegram_id)
     await bot.send_message(message.chat.id, f'Flavour Flow user information:'
                                       f'\nUsername: {user_profile.username}'
                                       f'\nEmail: {user_profile.email}'
@@ -466,8 +466,8 @@ async def send_question_to_support_group(message: Message, state: FSMContext):
     await main_menu(message, message.from_user.id)
     database.PendingUser.add_new_pending(user_id)
     markup = InlineKeyboardBuilder()
-    markup.button(text='💬 Answer', callback_data=f"action:answer:{user_id}")
-    markup.button(text='❌ Ignore', callback_data=f"action:ignore:{user_id}")
+    markup.button(text='💬 Answer', callback_data=f"{message.chat.id}:{message.message_id}:{user_id}:answer")
+    markup.button(text='❌ Ignore', callback_data=f"{message.chat.id}:{message.message_id}:{user_id}:ignore")
     markup.adjust(1, 1)
 
     await bot.send_message(GROUP_ID,
@@ -589,7 +589,7 @@ async def send_answer(message: Message, chat_id: int, message_id: int, user_id: 
 
 
 async def answer_message(callback: CallbackQuery):
-    text_split = callback.data.split("-")
+    text_split = callback.data.split(":")
     chat_id = text_split[0]
     user_id = text_split[1]
     question_message_id = text_split[2]
@@ -599,7 +599,7 @@ async def answer_message(callback: CallbackQuery):
 
 
 async def ignore_message(callback):
-    text_split = callback.data.split("-")
+    text_split = callback.data.split(":")
     chat_id = text_split[0]
     user_id = text_split[1]
     question_message_id = text_split[2]
