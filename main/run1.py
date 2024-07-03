@@ -31,8 +31,8 @@ async def start(message: Message):
         return
 
     if database.Consumer.is_authenticated(message.from_user.id):
-        username = database.Consumer.get_by_telegram_id(message.from_user.id)
-        await message.answer(f"Welcome. You are authorized as {username.enter_login_password}!")
+        consumer = database.Consumer.get_by_telegram_id(message.from_user.id)
+        await message.answer(f"Welcome. You are authorized as {consumer.username}!")
     else:
         await message.answer("Welcome. You are not authorized! You can do it below")
 
@@ -54,7 +54,7 @@ async def command_help(message: Message):
         return
 
     try:
-        username = database.Consumer.get_by_telegram_id(message.from_user.id).enter_login_password
+        username = database.Consumer.get_by_telegram_id(message.from_user.id).username
         database.Consumer.change_telegram_id(username, 0)
         await message.answer("Successfully logout")
         await main_menu(message)
@@ -234,8 +234,8 @@ async def process_callback(callback_query: CallbackQuery, state: FSMContext):
 async def print_profile_info(message: Message):
     user_profile = database.Consumer.get_by_telegram_id(message.from_user.id)
     await bot.send_message(message.chat.id, f'Flavour Flow user information:'
-                                      f'\nUsername: {user_profile.enter_login_password}'
-                                      f'\nEmail: {user_profile.enter_email}'
+                                      f'\nUsername: {user_profile.username}'
+                                      f'\nEmail: {user_profile.email}'
                                       f'\nBonuses: {user_profile.bonuses}')
     await main_menu(message)
 
@@ -452,8 +452,8 @@ async def main_menu(message: Message):
                                     url='http://flavourflow.eu-central-1.elasticbeanstalk.com')
 
     inline_keyboard.append([catalog_btn])
-    inline_keyboard.append([ support_btn])
-    inline_keyboard.append([ site_btn])
+    inline_keyboard.append([support_btn])
+    inline_keyboard.append([site_btn])
     markup = InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
 
     await message.answer("Main menu. Choose the option:", reply_markup=markup)
@@ -473,10 +473,10 @@ async def send_question_to_support_group(message: Message, state: FSMContext):
     await bot.send_message(GROUP_ID,
                            f"<b>New question was taken!</b>"
                            f"\n<b>From:</b> {message.from_user.first_name} (FFlow username: "
-                           f"{database.Consumer.get_by_telegram_id(message.from_user.id).enter_login_password})"
+                           f"{database.Consumer.get_by_telegram_id(message.from_user.id).username})"
                            f"\nID: {message.chat.id}"
                            f"\n<b>Message:</b> \"{message.text}\"", reply_markup=markup.as_markup(), parse_mode='HTML')
-    # await state.clear()
+    await state.clear()
 
 
 @router.message(Form.enter_login_password)
@@ -550,9 +550,9 @@ async def registration_result(message: types.Message, state: FSMContext):
     if password == confirm_password and not database.Consumer.is_username_already_exists(username):
         user_data.update({'telegram_id': message.from_user.id})
         database.Consumer.add_new(user_data)
+        consumer = database.Consumer.get_by_telegram_id(message.from_user.id)
         await message.reply(
-            f"Successful registration. Welcome " 
-        f"{database.Consumer.get_by_telegram_id(message.from_user.id).enter_login_password}!")
+            f"Successful registration. Welcome {consumer.username}!")
         await main_menu(message)
     elif password != confirm_password:
         await message.reply("Passwords are different, try again")
@@ -573,7 +573,7 @@ async def login_result(message: types.Message, state: FSMContext):
     if is_correct_username and is_correct_password:
         database.Consumer.change_telegram_id(username, message.from_user.id)
         await message.reply(f"Success authorization. Welcome "
-                            f"{database.Consumer.get_by_telegram_id(message.from_user.id).enter_login_password}!")
+                            f"{database.Consumer.get_by_telegram_id(message.from_user.id).username}!")
         await main_menu(message)
     else:
         await message.reply("Username or password is incorrect")
