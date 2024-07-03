@@ -241,7 +241,7 @@ async def print_profile_info(message: Message, telegram_id):
 
 
 async def print_orders_info(message: Message, telegram_id):
-    user_id = database.Consumer.get_by_telegram_id(message.from_user.id).id
+    user_id = database.Consumer.get_by_telegram_id(telegram_id).id
     orders = database.Order.get_all_by_user_id(user_id)
     await message.answer('Your orders:')
     for order in orders:
@@ -466,8 +466,8 @@ async def send_question_to_support_group(message: Message, state: FSMContext):
     await main_menu(message, message.from_user.id)
     database.PendingUser.add_new_pending(user_id)
     markup = InlineKeyboardBuilder()
-    markup.button(text='💬 Answer', callback_data=f"{message.chat.id}:{message.message_id}:{user_id}:answer")
-    markup.button(text='❌ Ignore', callback_data=f"{message.chat.id}:{message.message_id}:{user_id}:ignore")
+    markup.button(text='💬 Answer', callback_data=f"{message.chat.id}:{user_id}:{message.message_id}:answer")
+    markup.button(text='❌ Ignore', callback_data=f"{message.chat.id}:{user_id}:{message.message_id}:ignore")
     markup.adjust(1, 1)
 
     await bot.send_message(GROUP_ID,
@@ -595,7 +595,7 @@ async def answer_message(callback: CallbackQuery):
     question_message_id = text_split[2]
     message_id = callback.message.message_id
     await bot.send_message(callback.message.chat.id, "Enter your answer: ")
-    dp.message.register(send_answer, F.chat.id == callback.message.chat.id, chat_id, message_id, user_id, question_message_id)
+    dp.message.register(send_answer, F.chat.id == callback.message, callback.message, chat_id, message_id, user_id, question_message_id)
 
 
 async def ignore_message(callback):
