@@ -36,7 +36,7 @@ async def start(message: Message):
     else:
         await message.answer("Welcome. You are not authorized! You can do it below")
 
-    await main_menu(message)
+    await main_menu(message, message.from_user.id)
 
 
 @router.message(Command('menu'))
@@ -44,7 +44,7 @@ async def start(message: Message):
     if message.chat.type != 'private':
         await message.answer("I don't work in groups")
         return
-    await main_menu(message)
+    await main_menu(message, message.from_user.id)
 
 
 @router.message(Command('logout'))
@@ -57,10 +57,10 @@ async def command_help(message: Message):
         username = database.Consumer.get_by_telegram_id(message.from_user.id).username
         database.Consumer.change_telegram_id(username, 0)
         await message.answer("Successfully logout")
-        await main_menu(message)
+        await main_menu(message, message.from_user.id)
     except AttributeError:
         await message.answer("You are not authorized!")
-        await main_menu(message)
+        await main_menu(message, message.from_user.id)
 
 
 @router.message(Command('image'))
@@ -134,7 +134,7 @@ async def process_callback(callback_query: CallbackQuery, state: FSMContext):
 
     elif data == "main menu":
         await bot.delete_message(chat_id, callback_query.message.message_id)
-        await main_menu(callback_query.message)
+        await main_menu(callback_query.message, callback_query.from_user.id)
 
     elif data == "login":
         await bot.delete_message(chat_id, callback_query.message.message_id)
@@ -228,7 +228,7 @@ async def process_callback(callback_query: CallbackQuery, state: FSMContext):
 
     elif "deny-delete" in data:
         await bot.delete_message(chat_id, callback_query.message.message_id)
-        await main_menu(callback_query.message)
+        await main_menu(callback_query.message, callback_query.from_user.id)
 
 
 async def print_profile_info(message: Message):
@@ -237,7 +237,7 @@ async def print_profile_info(message: Message):
                                       f'\nUsername: {user_profile.username}'
                                       f'\nEmail: {user_profile.email}'
                                       f'\nBonuses: {user_profile.bonuses}')
-    await main_menu(message)
+    await main_menu(message, message.from_user.id)
 
 
 async def print_orders_info(message: Message):
@@ -258,7 +258,7 @@ async def print_orders_info(message: Message):
             f'Address: {address}'
         )
 
-    await main_menu(message)
+    await main_menu(message, message.from_user.id)
 
 
 async def confirm_delete_product(message: Message, product_id: int):
@@ -286,7 +286,7 @@ async def delete_product(message, product_id):
     await bot.delete_message(message.chat.id, message.message_id)
     database.Product.delete(message, bot, product_id)
     await bot.send_message(message.chat.id, 'Deleted successfully')
-    await main_menu(message)
+    await main_menu(message, message.from_user.id)
 
 
 async def delete_company(message, company_id):
@@ -377,7 +377,7 @@ async def send_image_or_link(message: Message, values: dict, state: FSMContext):
             values.update({'price': float(message.text)})
         except ValueError:
             await message.answer('I told you to use only numbers. Try again')
-            await main_menu(message)
+            await main_menu(message, message.from_user.id)
             return False
 
     if values.get('image_way') == 'DROPBOX':
@@ -401,7 +401,7 @@ async def upload_image(message: Message, state: FSMContext):
         await dropbox.upload_file(message, photo_bytes, bot, values)
     except TypeError:
         await message.answer('It is not an image')
-        await main_menu(message)
+        await main_menu(message, message.from_user.id)
 
 
 @router.message(Form.add_item)
@@ -417,7 +417,7 @@ async def add_item_with_link(message: Message, state: FSMContext):
     else:
         database.Product.add_new(values)
     await message.answer('Item added')
-    await main_menu(message)
+    await main_menu(message, message.from_user.id)
 
 
 async def add_item_with_dropbox_link(message: Message, values):
@@ -429,19 +429,19 @@ async def add_item_with_dropbox_link(message: Message, values):
     else:
         database.Product.add_new(values)
     await message.answer('Item added')
-    await main_menu(message)
+    await main_menu(message, message.from_user.id)
 
 
-async def main_menu(message: Message):
+async def main_menu(message: Message, user_id):
     # markup = types.InlineKeyboardMarkup(inline_keyboard=[])
     inline_keyboard = []
 
-    if database.Consumer.is_authenticated(message.from_user.id):
+    if database.Consumer.is_authenticated(user_id):
         profile_btn = InlineKeyboardButton(text='🎗️ Profile', callback_data='profile')
         orders_btn = InlineKeyboardButton(text='🧾 Orders', callback_data='orders')
         inline_keyboard.append([profile_btn, orders_btn])
 
-    elif not database.Consumer.is_authenticated(message.from_user.id):
+    elif not database.Consumer.is_authenticated(user_id):
         login_btn = InlineKeyboardButton(text='👤 Login', callback_data='login')
         register_btn = InlineKeyboardButton(text='🆕 Registration', callback_data='register')
         inline_keyboard.append([login_btn, register_btn])
@@ -463,7 +463,7 @@ async def main_menu(message: Message):
 async def send_question_to_support_group(message: Message, state: FSMContext):
     user_id = message.from_user.id
     await message.reply("Your question was sent")
-    await main_menu(message)
+    await main_menu(message, message.from_user.id)
     database.PendingUser.add_new_pending(user_id)
     markup = InlineKeyboardBuilder()
     markup.button(text='💬 Answer', callback_data=f"action:answer:{user_id}")
@@ -499,11 +499,11 @@ async def enter_email(message: types.Message, state: FSMContext):
 
     elif database.Consumer.is_username_already_exists(username):
         await bot.send_message(message.chat.id, "This username is already in use")
-        await main_menu(message)
+        await main_menu(message, message.from_user.id)
 
     elif re.search(r'^[a-zA-Z][a-zA-Z0-9_]*$', username) is None:
         await message.reply("Username must start with a letter and contain only letters, numbers, and underscores")
-        await main_menu(message)
+        await main_menu(message, message.from_user.id)
 
 
 @router.message(Form.enter_registration_password)
@@ -517,11 +517,11 @@ async def enter_registration_password(message: types.Message, state: FSMContext)
 
     elif database.Consumer.is_email_already_exists(email):
         await message.reply("This email is already in use")
-        await main_menu(message)
+        await main_menu(message, message.from_user.id)
 
     elif re.search(r'^[^\s@]+@[^\s@]+\.[^\s@]+$', email) is None:
         await message.reply("Incorrect email")
-        await main_menu(message)
+        await main_menu(message, message.from_user.id)
 
 
 @router.message(Form.enter_confirm_password)
@@ -537,7 +537,7 @@ async def enter_confirm_password(message: types.Message, state: FSMContext):
         await bot.send_message(message.chat.id,
                          "Password must be 6-15 characters long and contain at least one letter, "
                          "one digit, and one special character")
-        await main_menu(message)
+        await main_menu(message, message.from_user.id)
 
 
 @router.message(Form.confirm_password)
@@ -553,10 +553,10 @@ async def registration_result(message: types.Message, state: FSMContext):
         consumer = database.Consumer.get_by_telegram_id(message.from_user.id)
         await message.reply(
             f"Successful registration. Welcome {consumer.username}!")
-        await main_menu(message)
+        await main_menu(message, message.from_user.id)
     elif password != confirm_password:
         await message.reply("Passwords are different, try again")
-        await main_menu(message)
+        await main_menu(message, message.from_user.id)
 
     await state.clear()
 
@@ -574,10 +574,10 @@ async def login_result(message: types.Message, state: FSMContext):
         database.Consumer.change_telegram_id(username, message.from_user.id)
         await message.reply(f"Success authorization. Welcome "
                             f"{database.Consumer.get_by_telegram_id(message.from_user.id).username}!")
-        await main_menu(message)
+        await main_menu(message, message.from_user.id)
     else:
         await message.reply("Username or password is incorrect")
-        await main_menu(message)
+        await main_menu(message, message.from_user.id)
 
 
 async def send_answer(message: Message, chat_id: int, message_id: int, user_id: int, question_message_id: int):
@@ -715,7 +715,7 @@ async def products_catalog(callback: CallbackQuery):
             await bot.send_message(callback.message.chat.id,
                                    "The product list of this company is empty or not enough. "
                                    "Wait until administrator add products")
-            await main_menu(callback.message)
+            await main_menu(callback.message, callback.from_user.id)
 
 
 async def send_alarm(bot: Bot, admin_id: int, message: str):
