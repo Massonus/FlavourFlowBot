@@ -31,8 +31,8 @@ async def start(message: Message):
         return
 
     if database.Consumer.is_authenticated(message.from_user.id):
-        user = database.Consumer.get_by_telegram_id(message.from_user.id)
-        await message.answer(f"Welcome. You are authorized as {user.enter_login_password}!")
+        username = database.Consumer.get_by_telegram_id(message.from_user.id)
+        await message.answer(f"Welcome. You are authorized as {username.enter_login_password}!")
     else:
         await message.answer("Welcome. You are not authorized! You can do it below")
 
@@ -304,7 +304,7 @@ async def image_question(message, product_category=None, company_id=None):
 
 
 @router.message(Form.product_title)
-async def enter_product_title(message: Message, state: FSMContext):
+async def enter_product_title(message: Message, state: FSMContext, values):
     data = await state.get_data()
     values = data.get('values', {})
     await state.update_data(title=message.text)
@@ -398,7 +398,7 @@ async def upload_image(message: Message, state: FSMContext):
         photo_id = message.photo[-1].file_id
         photo_file = await bot.get_file(photo_id)
         photo_bytes = await bot.download_file(photo_file.file_path)
-        dropbox.upload_file(message, photo_bytes, bot, values)
+        await dropbox.upload_file(message, photo_bytes, bot, values)
     except TypeError:
         await message.answer('It is not an image')
         await main_menu(message)
@@ -420,12 +420,15 @@ async def add_item_with_link(message: Message, state: FSMContext):
     await main_menu(message)
 
 
-async def add_item_with_dropbox_link(message, values):
+async def add_item_with_dropbox_link(message: Message, values):
     item_type = values.get('type').lower()
     values.pop('type')
     values.pop('image_way')
-    database.Company.add_new(values) if item_type == "company" else database.Product.add_new(values)
-    await bot.send_message(message.chat.id, 'Item added')
+    if item_type == "company":
+        database.Company.add_new(values)
+    else:
+        database.Product.add_new(values)
+    await message.answer('Item added')
     await main_menu(message)
 
 
@@ -549,7 +552,7 @@ async def registration_result(message: types.Message, state: FSMContext):
         database.Consumer.add_new(user_data)
         await message.reply(
             f"Successful registration. Welcome " 
-        f" {database.Consumer.get_by_telegram_id(message.from_user.id).enter_login_password}!")
+        f"{database.Consumer.get_by_telegram_id(message.from_user.id).enter_login_password}!")
         await main_menu(message)
     elif password != confirm_password:
         await message.reply("Passwords are different, try again")
