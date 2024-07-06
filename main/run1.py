@@ -3,7 +3,6 @@ from time import sleep
 import traceback
 import asyncio
 from aiogram import Router, Bot, Dispatcher, types, F
-# from aiogram.utils import executor
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.context import FSMContext
@@ -209,7 +208,7 @@ async def process_callback(callback_query: CallbackQuery, state: FSMContext):
         country_id = int(data.split('-')[1])
         image_way = data.split('-')[2]
         await state.set_state(Form.company_title)
-        await enter_company_title(callback_query.message, category_id, country_id, image_way)
+        await enter_company_title(callback_query.message, category_id, country_id, image_way, state)
 
     elif "delete-product" in data:
         product_id = int(data.split('-')[0])
@@ -305,12 +304,12 @@ async def image_question(message, product_category=None, company_id=None):
 
 
 @router.message(Form.product_title)
-async def enter_product_title(message: Message, state: FSMContext, values):
-    data = await state.get_data()
-    values = data.get('values', {})
-    await state.update_data(title=message.text)
+async def enter_product_title(message: Message, state: FSMContext):
+    # data = await state.get_data()
+    # values = data.get('values', {})
+    # await state.update_data(title=message.text)
     await state.set_state(Form.product_description)
-    await message.reply('Enter product description:')
+    await message.reply('Enter product title:')
 
 
 async def choose_kitchen_category(message: Message, image_way):
@@ -323,7 +322,7 @@ async def choose_kitchen_category(message: Message, image_way):
     await bot.send_message(message.chat.id, 'Choose company category:', reply_markup=markup)
 
 
-async def choose_company_country(message, category_id, image_way):
+async def choose_company_country(message: Message, category_id, image_way):
     await bot.delete_message(message.chat.id, message.message_id)
     countries = database.Country.get_all()
     builder = InlineKeyboardBuilder()
@@ -333,44 +332,60 @@ async def choose_company_country(message, category_id, image_way):
 
 
 @router.message(Form.company_title)
-async def enter_company_title(message, country_id, category_id, image_way, state: FSMContext):
+async def enter_company_title(message: Message, country_id, category_id, image_way, state: FSMContext):
     values = {'type': 'COMPANY', 'image_way': image_way, 'country_id': country_id, 'category_id': category_id}
     await state.update_data(values=values)
-    await bot.delete_message(message.chat.id, message.message_id)
+    # await bot.delete_message(message.chat.id, message.message_id)
     await message.reply('Enter company title:')
     await state.set_state(Form.company_description)
 
 
 @router.message(Form.company_description)
 async def enter_company_description(message: Message, state: FSMContext):
-    await state.update_data(description=message.text)
+    data = await state.get_data()
+    values = data.get('values', {})
+    values['title'] = message.text
+    await state.update_data(title=message.text)
     await bot.send_message(message.chat.id, 'Enter company description:')
     await state.set_state(Form.image_link)
 
 
 @router.message(Form.product_description)
 async def enter_product_description(message: Message, state: FSMContext):
-    await state.update_data(description=message.text)
+    data = await state.get_data()
+    values = data.get('values', {})
+    values['title'] = message.text
+    await state.update_data(title=message.text)
     await state.set_state(Form.product_composition)
-    await message.reply('Enter product composition:')
+    await message.reply('Enter product description:')
 
 
 @router.message(Form.product_composition)
 async def enter_product_composition(message: Message, state: FSMContext):
-    await state.update_data(composition=message.text)
+    data = await state.get_data()
+    values = data.get('values', {})
+    values['description'] = message.text
+    await state.update_data(description=message.text)
     await state.set_state(Form.product_price)
-    await message.reply('Enter product price (use only numbers):')
+    await message.reply('Enter product composition:')
 
 
 @router.message(Form.product_price)
 async def enter_product_price(message: types.Message, state: FSMContext):
-    await state.update_data(price=message.text)
+    data = await state.get_data()
+    values = data.get('values', {})
+    values['composition'] = message.text
+    await state.update_data(composition=message.text)
     await state.set_state(Form.image_link)
-    await message.reply('Enter product composition:')
+    await message.reply('Enter price:')
 
 
 @router.message(Form.image_link)
-async def send_image_or_link(message: Message, values: dict, state: FSMContext):
+async def send_image_or_link(message: Message, state: FSMContext):
+    data = await state.get_data()
+    values = data.get('values', {})
+    # values['price'] = message.text
+    # await state.update_data(price=message.text)
     if values.get('type') == 'COMPANY':
         values.update({'description': message.text})
     else:
@@ -381,14 +396,14 @@ async def send_image_or_link(message: Message, values: dict, state: FSMContext):
             await main_menu(message, message.from_user.id)
             return False
 
+    await state.update_data(values=values)
+
     if values.get('image_way') == 'DROPBOX':
         await message.answer('Send here your image')
         await state.set_state(Form.upload_img)
-        await state.update_data(values=values)
     elif values.get('image_way') == 'LINK':
         await message.answer('Enter your link')
         await state.set_state(Form.add_item)
-        await state.update_data(values=values)
 
 
 @router.message(Form.upload_img)
@@ -612,12 +627,12 @@ async def answer_message(callback: CallbackQuery, state: FSMContext):
 
 async def ignore_message(callback: CallbackQuery):
     text_split = callback.data.split(":")
-    chat_id = int(text_split[0])
-    user_id = int(text_split[1])
+    chat_id = text_split[0]
+    user_id = text_split[1]
     question_message_id = int(text_split[2])
     message_id = callback.message.message_id
     await bot.send_message(chat_id, "Unfortunately, your question was denied", reply_to_message_id=question_message_id)
-    await bot.delete_message(chat_id, message_id)
+    await bot.delete_message(GROUP_ID, message_id)
     database.PendingUser.delete_pending(user_id)
 
 
