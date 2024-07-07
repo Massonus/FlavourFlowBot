@@ -15,7 +15,7 @@ class Form(StatesGroup):
     waiting_for_upload = State()
 
 
-async def dbx_init_token(message: Message, photo_bytes, values):
+async def dbx_init_token(message: Message, photo_bytes, values, state: FSMContext):
     auth_flow = DropboxOAuth2FlowNoRedirect(config.APP_KEY, config.APP_SECRET)
 
     authorize_url = auth_flow.start()
@@ -24,7 +24,6 @@ async def dbx_init_token(message: Message, photo_bytes, values):
     await message.answer("2. Click \"Allow\" (you might have to log in first).")
     await message.answer("3. Copy the authorization code.")
     await message.answer("Enter the authorization code here:")
-    state = router.fsm.get_state(message.from_user.id)
     await state.update_data(auth_flow=auth_flow, photo_bytes=photo_bytes, values=values)
     await state.set_state(Form.token)
 
@@ -54,14 +53,14 @@ async def after_init_token(message: Message, state: FSMContext):
     await state.clear()
 
 
-async def get_dbx(message: Message, values: dict, photo_bytes: bytes = None):
+async def get_dbx(message: Message, values, photo_bytes: bytes = None):
     try:
         token = database.AccessToken.get_token().value
         dbx = dropbox.Dropbox(token)
         dbx.users_get_current_account()
         return dbx
     except (dropbox.exceptions.AuthError, AttributeError):
-        await dbx_init_token(message, photo_bytes, values)
+        await dbx_init_token(message, photo_bytes, bot, values)
 
 
 async def upload_file(message: Message, photo_bytes: bytes, values: dict):

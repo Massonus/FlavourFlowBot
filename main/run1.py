@@ -414,8 +414,7 @@ async def upload_image(message: Message, state: FSMContext):
         photo_id = message.photo[-1].file_id
         photo_file = await bot.get_file(photo_id)
         photo_bytes = await bot.download_file(photo_file.file_path)
-        photo_bytes = photo_bytes.read()
-        await dropbox.upload_file(message, photo_bytes, values)
+        await dropbox.upload_file(message, photo_bytes, bot, values)
     except TypeError:
         await message.answer('It is not an image')
         await main_menu(message, message.from_user.id)
