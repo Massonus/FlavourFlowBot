@@ -274,27 +274,27 @@ class Company(Base):
         session.commit()
 
     @staticmethod
-    def delete(message, bot, company_id):
+    async def delete(message, state, company_id):
         company = session.query(Company).filter_by(id=company_id).first()
         image_link = company.image_link
 
         if "dropbox" in image_link:
             values = {'type': 'company', 'id': str(company_id)}
-            dropbox.delete_file(message, bot, values)
+            await dropbox.delete_file(message, state, values)
         else:
-            Company.delete_directly(company_id, bot, message)
+            await Company.delete_directly(company_id, message, state)
 
     @staticmethod
-    def delete_directly(company_id, bot, message):
+    async def delete_directly(company_id, message, state):
         products = Product.get_all_by_company_id(company_id)
         for product in products:
-            Product.delete(message=message, bot=bot, product_id=product.id)
+            await Product.delete(message=message, product_id=product.id, state=state)
 
         company = session.query(Company).filter_by(id=company_id).first()
         title = company.title
         session.delete(company)
         session.commit()
-        bot.send_message(message.chat.id, f'Company: {title} deleted successfully')
+        await message.answer(f'Company: {title} deleted successfully')
         return True
 
 
@@ -325,22 +325,22 @@ class Product(Base):
         return session.query(Product).filter_by(company_id=company_id).all()
 
     @staticmethod
-    def delete(message, bot, product_id):
+    async def delete(message, state, product_id):
         product = session.query(Product).filter_by(id=product_id).first()
         image_link = product.image_link
         if "dropbox" in image_link:
             values = {'type': 'product', 'id': str(product_id)}
-            dropbox.delete_file(message, bot, values)
+            await dropbox.delete_file(message, state, values)
         else:
-            Product.delete_directly(product.id, bot, message)
+            await Product.delete_directly(product.id, message)
 
     @staticmethod
-    def delete_directly(product_id, bot, message):
+    async def delete_directly(product_id, message):
         product = session.query(Product).filter_by(id=product_id).first()
         title = product.title
         session.delete(product)
         session.commit()
-        bot.send_message(message.chat.id, f'Product: {title} deleted successfully')
+        await message.answer(f'Product: "{title}" deleted successfully')
         return True
 
     @staticmethod
@@ -458,7 +458,9 @@ class Consumer(Base):
         values.update(
             {'password': bcrypt.hash(values.get('password')), 'bonuses': 0, 'redactor': 'telegram registration',
              'id': user_id})
-        consumer = Consumer(**values)
+        consumer = Consumer(username=values.get('username'), email=values.get('email'), password=values.get('password'),
+                            telegram_id=values.get('telegram_id'), bonuses=0, redactor='telegram registration',
+                            id=values.get('id'))
         session.add(consumer)
         change_sequence(Consumer.__tablename__, user_id)
         session.commit()

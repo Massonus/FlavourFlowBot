@@ -67,7 +67,7 @@ instance/
 
 # Scrapy stuff:
 .scrapy
-main/config.py
+main_directory/config.py
 
 # Sphinx documentation
 docs/_build/
