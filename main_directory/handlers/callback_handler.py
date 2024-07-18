@@ -135,11 +135,11 @@ async def process_callback(callback_query: CallbackQuery, state: FSMContext):
 
         case _ if "conf-del-prod" in data:
             product_id = int(data.split('-')[0])
-            await run1.delete_product(callback_query.message, product_id)
+            await run1.delete_product(callback_query.message, state, product_id)
 
         case _ if "conf-del-comp" in data:
             company_id = int(data.split('-')[0])
-            await run1.delete_company(callback_query.message, company_id)
+            await run1.delete_company(callback_query.message, state, company_id)
 
         case _ if "deny-delete" in data:
             await message.delete()

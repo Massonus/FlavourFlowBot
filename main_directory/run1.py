@@ -93,16 +93,15 @@ async def confirm_delete_company(message, company_id):
                            reply_markup=builder.as_markup())
 
 
-async def delete_product(message, product_id):
+async def delete_product(message, state, product_id):
     await bot.delete_message(message.chat.id, message.message_id)
-    database.Product.delete(message, bot, product_id)
+    await database.Product.delete(message, state, bot, product_id)
     await bot.send_message(message.chat.id, 'Deleted successfully')
-    await main_menu(message, message.from_user.id)
 
 
-async def delete_company(message, company_id):
+async def delete_company(message, state, company_id):
     await bot.delete_message(message.chat.id, message.message_id)
-    database.Company.delete(message, bot, company_id)
+    await database.Company.delete(message, state, bot, company_id)
 
 
 async def image_question(message, product_category=None, company_id=None):

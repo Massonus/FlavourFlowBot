@@ -34,7 +34,7 @@ async def dbx_init_token(message: Message, photo_bytes, values, state: FSMContex
 
 @router.message(Form.after_init)
 async def after_init_token(message: Message, state: FSMContext):
-    await message.answer("hello from after init token")
+    await message.answer("Updating token...")
     data = await state.get_data()
     auth_flow = data['auth_flow']
     photo_bytes = data['photo_bytes']
@@ -51,7 +51,7 @@ async def after_init_token(message: Message, state: FSMContext):
     await message.answer("Successfully set up client!")
 
     if photo_bytes is None:
-        await delete_file(message, values)
+        await delete_file(message, state, values)
     else:
         await upload_file(message, photo_bytes, values, state)
 
@@ -88,16 +88,16 @@ async def upload_file(message: Message, photo_bytes: bytes, values: dict, state:
         print("Waiting...")
 
 
-async def delete_file(message: Message, values: dict):  # Добавляем параметр bot
+async def delete_file(message: Message, state: FSMContext, values: dict):
     path = "/FlowImages/" + values.get('type').upper() + "/" + values.get('type') + values.get('id') + ".jpg"
-    dbx = await get_dbx(message, values)
+    dbx = await get_dbx(message, state, values)
 
     try:
         dbx.files_delete_v2(path)
         if values.get('type').upper() == 'COMPANY':
-            database.Company.delete_directly(int(values.get('id')), bot, message)  # Передаем bot сюда
+            await database.Company.delete_directly(int(values.get('id')), bot, message, state)
         else:
-            database.Product.delete_directly(int(values.get('id')), bot, message)  # Передаем bot сюда
+            await database.Product.delete_directly(int(values.get('id')), bot, message)
     except AttributeError:
         print("Waiting oauth...")
     except dropbox.exceptions.ApiError as error:
