@@ -9,7 +9,7 @@ from dropbox import DropboxOAuth2FlowNoRedirect
 
 import config
 import database_owm as database
-import run1
+import main_directory.handlers.output_handler as output
 
 router = Router()
 bot = Bot(token=config.TG_TOKEN)
@@ -83,7 +83,7 @@ async def upload_file(message: Message, photo_bytes: bytes, values: dict, state:
                                                                              "dl.dropboxusercontent.com")
         values.update({'image_link': url})
 
-        await run1.add_item_with_dropbox_link(message, values)
+        await output.add_item_with_dropbox_link(message, values)
     except (dropbox.exceptions.AuthError, AttributeError):
         print("Waiting...")
 
@@ -95,7 +95,7 @@ async def delete_file(message: Message, state: FSMContext, values: dict):
     try:
         dbx.files_delete_v2(path)
         if values.get('type').upper() == 'COMPANY':
-            await database.Company.delete_directly(int(values.get('id')), bot, message, state)
+            await database.Company.delete_directly(int(values.get('id')), message, state)
         else:
             await database.Product.delete_directly(int(values.get('id')), message)
     except AttributeError:

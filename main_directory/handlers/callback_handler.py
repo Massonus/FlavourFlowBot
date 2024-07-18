@@ -5,6 +5,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 import main_directory.database_owm as database
 import main_directory.run1 as run1
+import main_directory.handlers.output_handler as output
 from main_directory.handlers.display_handler import main_menu, products_catalog, companies_catalog
 
 Form = run1.Form
@@ -20,10 +21,10 @@ async def process_callback(callback_query: CallbackQuery, state: FSMContext):
 
     match data:
         case _ if "answer" in data:
-            await run1.answer_message(callback_query, state)
+            await output.answer_message(callback_query, state)
 
         case _ if "ignore" in data:
-            await run1.ignore_message(callback_query)
+            await output.ignore_message(callback_query)
 
         case _ if "companies" in data:
             await companies_catalog(callback_query)
@@ -40,10 +41,10 @@ async def process_callback(callback_query: CallbackQuery, state: FSMContext):
             await message.answer(database.WishObject.add_new(product_id, user_id))
 
         case "profile":
-            await run1.print_profile_info(callback_query.message, callback_query.from_user.id)
+            await output.print_profile_info(callback_query.message, callback_query.from_user.id)
 
         case "orders":
-            await run1.print_orders_info(callback_query.message, callback_query.from_user.id)
+            await output.print_orders_info(callback_query.message, callback_query.from_user.id)
 
         case "main menu":
             await message.delete()
@@ -77,17 +78,17 @@ async def process_callback(callback_query: CallbackQuery, state: FSMContext):
 
         case _ if "add company" in data:
             await message.delete()
-            await run1.image_question(callback_query.message)
+            await output.image_question(callback_query.message)
 
         case _ if "meal" in data:
             company_id = int(data.split('-')[0])
             await message.delete()
-            await run1.image_question(callback_query.message, "MEAL", company_id)
+            await output.image_question(callback_query.message, "MEAL", company_id)
 
         case _ if "drink" in data:
             company_id = int(data.split('-')[0])
             await message.delete()
-            await run1.image_question(callback_query.message, "DRINK", company_id)
+            await output.image_question(callback_query.message, "DRINK", company_id)
 
         case _ if "dropbox" in data:
             try:
@@ -99,7 +100,7 @@ async def process_callback(callback_query: CallbackQuery, state: FSMContext):
                 await state.set_state(Form.product_title)
                 await run1.enter_product_title(callback_query.message, state)
             except ValueError:
-                await run1.choose_kitchen_category(callback_query.message, 'DROPBOX')
+                await output.choose_kitchen_category(callback_query.message, 'DROPBOX')
 
         case _ if "link" in data:
             try:
@@ -111,12 +112,12 @@ async def process_callback(callback_query: CallbackQuery, state: FSMContext):
                 await state.set_state(Form.product_title)
                 await run1.enter_product_title(callback_query.message, state)
             except ValueError:
-                await run1.choose_kitchen_category(callback_query.message, 'LINK')
+                await output.choose_kitchen_category(callback_query.message, 'LINK')
 
         case _ if "category" in data:
             category_id = int(data.split('-')[0])
             image_way = data.split('-')[1]
-            await run1.choose_company_country(callback_query.message, category_id, image_way)
+            await output.choose_company_country(callback_query.message, category_id, image_way)
 
         case _ if "country" in data:
             category_id = int(data.split('-')[0])
@@ -127,19 +128,19 @@ async def process_callback(callback_query: CallbackQuery, state: FSMContext):
 
         case _ if "delete-product" in data:
             product_id = int(data.split('-')[0])
-            await run1.confirm_delete_product(callback_query.message, product_id)
+            await output.confirm_delete_product(callback_query.message, product_id)
 
         case _ if "delete-company" in data:
             company_id = int(data.split('-')[0])
-            await run1.confirm_delete_company(callback_query.message, company_id)
+            await output.confirm_delete_company(callback_query.message, company_id)
 
         case _ if "conf-del-prod" in data:
             product_id = int(data.split('-')[0])
-            await run1.delete_product(callback_query.message, state, product_id)
+            await output.delete_product(callback_query.message, state, product_id)
 
         case _ if "conf-del-comp" in data:
             company_id = int(data.split('-')[0])
-            await run1.delete_company(callback_query.message, state, company_id)
+            await output.delete_company(callback_query.message, state, company_id)
 
         case _ if "deny-delete" in data:
             await message.delete()
