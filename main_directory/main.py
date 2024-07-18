@@ -26,11 +26,9 @@ async def main():
     dp = Dispatcher(storage=MemoryStorage())
     while True:
         try:
-            # Регистрируем обработчики из других модулей
             register_command_handlers(dp)
             register_run1_handlers(dp)
 
-            # Запускаем polling для получения обновлений от Telegram
             await dp.start_polling(bot)
         except Exception as ex:
             traceback_str = ''.join(traceback.format_tb(ex.__traceback__))

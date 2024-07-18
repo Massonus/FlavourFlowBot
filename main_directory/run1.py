@@ -11,6 +11,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 import database_owm as database
 import dropbox_factory as dropbox
 from config import GROUP_ID, TG_TOKEN
+from main_directory.handlers.display_handler import main_menu
 
 logging.basicConfig(level=logging.INFO)
 
@@ -41,139 +42,6 @@ class Form(StatesGroup):
 
 async def global_state_handler(state: FSMContext, state_value):
     await state.set_state(state_value)
-
-
-@router.callback_query(lambda call: True)
-async def process_callback(callback_query: CallbackQuery, state: FSMContext):
-    data = callback_query.data
-    user_id = callback_query.from_user.id
-    message = callback_query.message
-
-    if "answer" in data:
-        await answer_message(callback_query, state)
-
-    elif "ignore" in data:
-        await ignore_message(callback_query)
-
-    elif "companies" in data:
-        await companies_catalog(callback_query)
-
-    elif "products" in data:
-        await products_catalog(callback_query)
-
-    elif "add-basket" in data:
-        product_id = int(data.split('-')[0])
-        await message.answer(database.BasketObject.add_new(product_id, user_id))
-
-    elif "add-wish" in data:
-        product_id = int(data.split('-')[0])
-        await message.answer(database.WishObject.add_new(product_id, user_id))
-
-    elif data == "profile":
-        await print_profile_info(callback_query.message, callback_query.from_user.id)
-
-    elif data == "orders":
-        await print_orders_info(callback_query.message, callback_query.from_user.id)
-
-    elif data == "main menu":
-        await message.delete()
-        await main_menu(callback_query.message, callback_query.from_user.id)
-
-    elif data == "login":
-        await message.delete()
-        await global_state_handler(state, Form.enter_login_password)
-        await message.answer('Enter your username from Flavour Flow site')
-
-    elif data == "register":
-        await message.delete()
-        await state.set_state(Form.enter_email)
-        await message.reply('Enter your username')
-
-    elif data == "help":
-        if not database.PendingUser.is_pending(user_id):
-            await message.answer('Enter your question')
-            await state.set_state(Form.question)
-        else:
-            await message.answer('You have already sent a message, please wait an answer')
-
-    if "add product" in data:
-        company_id = int(data.split('-')[0])
-        await message.delete()
-        markup = InlineKeyboardBuilder()
-        markup.button(text='MEAL', callback_data=f'{company_id}-meal')
-        markup.button(text='DRINK', callback_data=f'{company_id}-drink')
-        markup.adjust(1, 1)
-        await message.answer('Choose product category', reply_markup=markup.as_markup())
-
-    elif "add company" in data:
-        await message.delete()
-        await image_question(callback_query.message)
-
-    elif "meal" in data:
-        company_id = int(data.split('-')[0])
-        await message.delete()
-        await image_question(callback_query.message, "MEAL", company_id)
-
-    elif "drink" in data:
-        company_id = int(data.split('-')[0])
-        await message.delete()
-        await image_question(callback_query.message, "DRINK", company_id)
-
-    elif "dropbox" in data:
-        try:
-            product_category = data.split('-')[0]
-            company_id = int(data.split('-')[1])
-            values = {'type': 'PRODUCT', 'product_category': product_category, 'image_way': 'DROPBOX',
-                      'company_id': company_id}
-            await state.update_data(values=values)
-            await state.set_state(Form.product_title)
-            await enter_product_title(callback_query.message, state)
-        except ValueError:
-            await choose_kitchen_category(callback_query.message, 'DROPBOX')
-
-    elif "link" in data:
-        try:
-            company_id = int(data.split('-')[1])
-            product_category = data.split('-')[0]
-            values = {'type': 'PRODUCT', 'product_category': product_category, 'image_way': 'LINK',
-                      'company_id': company_id}
-            await state.update_data(values=values)
-            await state.set_state(Form.product_title)
-            await enter_product_title(callback_query.message, state)
-        except ValueError:
-            await choose_kitchen_category(callback_query.message, 'LINK')
-
-    elif "category" in data:
-        category_id = int(data.split('-')[0])
-        image_way = data.split('-')[1]
-        await choose_company_country(callback_query.message, category_id, image_way)
-
-    elif "country" in data:
-        category_id = int(data.split('-')[0])
-        country_id = int(data.split('-')[1])
-        image_way = data.split('-')[2]
-        await state.set_state(Form.company_title)
-        await enter_company_title(callback_query.message, category_id, country_id, image_way, state)
-
-    elif "delete-product" in data:
-        product_id = int(data.split('-')[0])
-        await confirm_delete_product(callback_query.message, product_id)
-
-    elif "delete-company" in data:
-        company_id = int(data.split('-')[0])
-        await confirm_delete_company(callback_query.message, company_id)
-
-    elif "conf-del-prod" in data:
-        product_id = int(data.split('-')[0])
-        await delete_product(callback_query.message, product_id)
-
-    elif "conf-del-comp" in data:
-        company_id = int(data.split('-')[0])
-        await delete_company(callback_query.message, company_id)
-
-    elif "deny-delete" in data:
-        await message.delete()
-        await main_menu(callback_query.message, callback_query.from_user.id)
 
 
 async def print_profile_info(message: Message, telegram_id):
@@ -396,33 +264,135 @@ async def add_item_with_dropbox_link(message: Message, values):
     await message.answer('Item added')
     await main_menu(message, message.from_user.id)
 
+@router.callback_query(lambda call: True)
+async def process_callback(callback_query: CallbackQuery, state: FSMContext):
+    data = callback_query.data
+    user_id = callback_query.from_user.id
+    message = callback_query.message
 
-async def main_menu(message: Message, user_id):
-    # markup = types.InlineKeyboardMarkup(inline_keyboard=[])
-    inline_keyboard = []
+    if "answer" in data:
+        await answer_message(callback_query, state)
 
-    if database.Consumer.is_authenticated(user_id):
-        profile_btn = InlineKeyboardButton(text='🎗️ Profile', callback_data='profile')
-        orders_btn = InlineKeyboardButton(text='🧾 Orders', callback_data='orders')
-        inline_keyboard.append([profile_btn, orders_btn])
+    elif "ignore" in data:
+        await ignore_message(callback_query)
 
-    elif not database.Consumer.is_authenticated(user_id):
-        login_btn = InlineKeyboardButton(text='👤 Login', callback_data='login')
-        register_btn = InlineKeyboardButton(text='🆕 Registration', callback_data='register')
-        inline_keyboard.append([login_btn, register_btn])
+    elif "companies" in data:
+        await companies_catalog(callback_query)
 
-    catalog_btn = InlineKeyboardButton(text='🏪 Go to catalog', callback_data='1-companies')
-    support_btn = InlineKeyboardButton(text='💬 Write to us', callback_data='help')
-    site_btn = InlineKeyboardButton(text='🔗 Go to our site',
-                                    url='http://flavourflow.eu-central-1.elasticbeanstalk.com')
+    elif "products" in data:
+        await products_catalog(callback_query)
 
-    inline_keyboard.append([catalog_btn])
-    inline_keyboard.append([support_btn])
-    inline_keyboard.append([site_btn])
-    markup = InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
+    elif "add-basket" in data:
+        product_id = int(data.split('-')[0])
+        await message.answer(database.BasketObject.add_new(product_id, user_id))
 
-    await message.answer("Main menu. Choose the option:", reply_markup=markup)
+    elif "add-wish" in data:
+        product_id = int(data.split('-')[0])
+        await message.answer(database.WishObject.add_new(product_id, user_id))
 
+    elif data == "profile":
+        await print_profile_info(callback_query.message, callback_query.from_user.id)
+
+    elif data == "orders":
+        await print_orders_info(callback_query.message, callback_query.from_user.id)
+
+    elif data == "main menu":
+        await message.delete()
+        await main_menu(callback_query.message, callback_query.from_user.id)
+
+    elif data == "login":
+        await message.delete()
+        await state.set_state(Form.enter_login_password)
+        await message.answer('Enter your username from Flavour Flow site')
+
+    elif data == "register":
+        await message.delete()
+        await state.set_state(Form.enter_email)
+        await message.answer('Enter your username')
+
+    elif data == "help":
+        if not database.PendingUser.is_pending(user_id):
+            await message.answer('Enter your question')
+            await state.set_state(Form.question)
+        else:
+            await message.answer('You have already sent a message, please wait an answer')
+
+    if "add product" in data:
+        company_id = int(data.split('-')[0])
+        await message.delete()
+        markup = InlineKeyboardBuilder()
+        markup.button(text='MEAL', callback_data=f'{company_id}-meal')
+        markup.button(text='DRINK', callback_data=f'{company_id}-drink')
+        markup.adjust(1, 1)
+        await message.answer('Choose product category', reply_markup=markup.as_markup())
+
+    elif "add company" in data:
+        await message.delete()
+        await image_question(callback_query.message)
+
+    elif "meal" in data:
+        company_id = int(data.split('-')[0])
+        await message.delete()
+        await image_question(callback_query.message, "MEAL", company_id)
+
+    elif "drink" in data:
+        company_id = int(data.split('-')[0])
+        await message.delete()
+        await image_question(callback_query.message, "DRINK", company_id)
+
+    elif "dropbox" in data:
+        try:
+            product_category = data.split('-')[0]
+            company_id = int(data.split('-')[1])
+            values = {'type': 'PRODUCT', 'product_category': product_category, 'image_way': 'DROPBOX', 'company_id': company_id}
+            await state.update_data(values=values)
+            await state.set_state(Form.product_title)
+            await enter_product_title(callback_query.message, state)
+        except ValueError:
+            await choose_kitchen_category(callback_query.message, 'DROPBOX')
+
+    elif "link" in data:
+        try:
+            company_id = int(data.split('-')[1])
+            product_category = data.split('-')[0]
+            values = {'type': 'PRODUCT', 'product_category': product_category, 'image_way': 'LINK', 'company_id': company_id}
+            await state.update_data(values=values)
+            await state.set_state(Form.product_title)
+            await enter_product_title(callback_query.message, state)
+        except ValueError:
+            await choose_kitchen_category(callback_query.message, 'LINK')
+
+    elif "category" in data:
+        category_id = int(data.split('-')[0])
+        image_way = data.split('-')[1]
+        await choose_company_country(callback_query.message, category_id, image_way)
+
+    elif "country" in data:
+        category_id = int(data.split('-')[0])
+        country_id = int(data.split('-')[1])
+        image_way = data.split('-')[2]
+        await state.set_state(Form.company_title)
+        await enter_company_title(callback_query.message, category_id, country_id, image_way, state)
+
+    elif "delete-product" in data:
+        product_id = int(data.split('-')[0])
+        await confirm_delete_product(callback_query.message, product_id)
+
+    elif "delete-company" in data:
+        company_id = int(data.split('-')[0])
+        await confirm_delete_company(callback_query.message, company_id)
+
+    elif "conf-del-prod" in data:
+        product_id = int(data.split('-')[0])
+        await delete_product(callback_query.message, product_id)
+
+    elif "conf-del-comp" in data:
+        company_id = int(data.split('-')[0])
+        await delete_company(callback_query.message, company_id)
+
+    elif "deny-delete" in data:
+        await message.delete()
+        await main_menu(callback_query.message, callback_query.from_user.id)
 
 @router.message(Form.question)
 async def send_question_to_support_group(message: Message, state: FSMContext):
