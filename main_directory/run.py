@@ -94,7 +94,7 @@ def callback_query(callback):
         callback.message.from_user.id = callback.from_user.id
         print_orders_info(callback.message)
 
-    elif callback.data == "main menu":
+    elif callback.data == "main_directory menu":
         bot.delete_message(callback.message.chat.id, callback.message.message_id)
         callback.message.from_user.id = callback.from_user.id
         main_menu(callback.message)
@@ -533,7 +533,7 @@ def companies_catalog(callback):
     company, count = database.Company.get_for_catalog(page, skip_size=1)  # skip_size - display by one element
 
     markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton(text='Return to main menu', callback_data='main menu'))
+    markup.add(types.InlineKeyboardButton(text='Return to main_directory menu', callback_data='main_directory menu'))
 
     markup.add(
         types.InlineKeyboardButton(text='Products of this company', callback_data=f"1-{company.id}-{page}-products"))
@@ -574,7 +574,7 @@ def products_catalog(callback):
         product, count = database.Product.get_for_catalog(company_id, page, skip_size=1)
 
         markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton(text='Return to main menu', callback_data='main menu'))
+        markup.add(types.InlineKeyboardButton(text='Return to main_directory menu', callback_data='main_directory menu'))
         markup.add(types.InlineKeyboardButton(text='Bask to companies', callback_data=f"{company_page}-companies"))
 
         if database.Consumer.is_admin(callback.from_user.id):
