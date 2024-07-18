@@ -7,8 +7,8 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message
 from dropbox import DropboxOAuth2FlowNoRedirect
 
-import config
-import database_owm as database
+import main_directory.config as config
+import main_directory.database_owm as database
 import main_directory.handlers.output_handler as output
 
 router = Router()
@@ -86,6 +86,8 @@ async def upload_file(message: Message, photo_bytes: bytes, values: dict, state:
         await output.add_item_with_dropbox_link(message, values)
     except (dropbox.exceptions.AuthError, AttributeError):
         print("Waiting...")
+    except dropbox.exceptions.ApiError as error:
+        await output.send_alarm(message.from_user.id, error)
 
 
 async def delete_file(message: Message, state: FSMContext, values: dict):

@@ -4,8 +4,8 @@ from sqlalchemy import (create_engine, Column, Integer, BigInteger,
                         String, func, Date, text, Time, DateTime)
 from sqlalchemy.orm import sessionmaker, declarative_base, exc
 
-import config
-import dropbox_factory as dropbox
+import main_directory.config as config
+import main_directory.dropbox_factory as dropbox
 
 engine = create_engine(
     f"postgresql+psycopg://{config.postgres_username}:{config.postgres_test_password}@{config.postgres_test_host}:5432"
