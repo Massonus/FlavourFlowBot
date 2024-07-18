@@ -40,10 +40,6 @@ class Form(StatesGroup):
     answer = State()
 
 
-async def global_state_handler(state: FSMContext, state_value):
-    await state.set_state(state_value)
-
-
 async def print_profile_info(message: Message, telegram_id):
     user_profile = database.Consumer.get_by_telegram_id(telegram_id)
     await bot.send_message(message.chat.id, f'Flavour Flow user information:'

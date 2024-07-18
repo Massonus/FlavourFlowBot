@@ -10,6 +10,7 @@ from config import ADMIN_ID, ADMIN2_ID, TG_TOKEN
 from main_directory.handlers.command_handler import register_command_handlers
 from run1 import register_run1_handlers
 from main_directory.handlers.callback_handler import register_callback_handlers
+from dropbox_factory import register_dropbox_factory
 
 API_TOKEN = TG_TOKEN
 
@@ -30,6 +31,7 @@ async def main():
             register_command_handlers(dp)
             register_run1_handlers(dp)
             register_callback_handlers(dp)
+            register_dropbox_factory(dp)
 
             await dp.start_polling(bot)
         except Exception as ex:

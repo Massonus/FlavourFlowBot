@@ -1,18 +1,22 @@
 import dropbox.exceptions
 import dropbox.files
-from aiogram.fsm.state import StatesGroup, State
-from dropbox import DropboxOAuth2FlowNoRedirect
+from aiogram import Bot
+from aiogram import Router
 from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message
+from dropbox import DropboxOAuth2FlowNoRedirect
+
 import config
 import database_owm as database
 import run1
-from run1 import router, bot
+
+router = Router()
+bot = Bot(token=config.TG_TOKEN)
 
 
 class Form(StatesGroup):
-    token = State()
-    waiting_for_upload = State()
+    after_init = State()
 
 
 async def dbx_init_token(message: Message, photo_bytes, values, state: FSMContext):
@@ -25,10 +29,10 @@ async def dbx_init_token(message: Message, photo_bytes, values, state: FSMContex
     await message.answer("3. Copy the authorization code.")
     await message.answer("Enter the authorization code here:")
     await state.update_data(auth_flow=auth_flow, photo_bytes=photo_bytes, values=values)
-    await state.set_state(Form.token)
+    await state.set_state(Form.after_init)
 
 
-@router.message(Form.token)
+@router.message(Form.after_init)
 async def after_init_token(message: Message, state: FSMContext):
     await message.answer("hello from after init token")
     data = await state.get_data()
@@ -99,3 +103,7 @@ async def delete_file(message: Message, values: dict):  # Добавляем п�
     except dropbox.exceptions.ApiError as error:
         await message.answer(f'Something is wrong {error}')
         return False
+
+
+def register_dropbox_factory(dp):
+    dp.include_router(router)
