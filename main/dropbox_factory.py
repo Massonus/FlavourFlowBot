@@ -30,6 +30,7 @@ async def dbx_init_token(message: Message, photo_bytes, values, state: FSMContex
 
 @router.message(Form.token)
 async def after_init_token(message: Message, state: FSMContext):
+    await message.answer("hello from after init token")
     data = await state.get_data()
     auth_flow = data['auth_flow']
     photo_bytes = data['photo_bytes']
@@ -48,32 +49,34 @@ async def after_init_token(message: Message, state: FSMContext):
     if photo_bytes is None:
         await delete_file(message, values)
     else:
-        await upload_file(message, photo_bytes, values)
+        await upload_file(message, photo_bytes, values, state)
 
     await state.clear()
 
 
-async def get_dbx(message: Message, values, photo_bytes: bytes = None):
+async def get_dbx(message: Message, state: FSMContext, values, photo_bytes: bytes = None):
     try:
         token = database.AccessToken.get_token().value
         dbx = dropbox.Dropbox(token)
         dbx.users_get_current_account()
         return dbx
     except (dropbox.exceptions.AuthError, AttributeError):
-        await dbx_init_token(message, photo_bytes, bot, values)
+        await dbx_init_token(message, photo_bytes, values, state)
 
 
-async def upload_file(message: Message, photo_bytes: bytes, values: dict):
-    dbx = await get_dbx(message, values, photo_bytes)
+async def upload_file(message: Message, photo_bytes: bytes, values: dict, state: FSMContext):
+    dbx = await get_dbx(message, state, values, photo_bytes)
     try:
         dbx.users_get_current_account()
         await message.answer("Don't do anything and wait an answer")
 
-        item_id = database.Company.get_max_id() + 1 if values.get('type').upper() == 'COMPANY' else database.Product.get_max_id() + 1
+        item_id = database.Company.get_max_id() + 1 if values.get(
+            'type').upper() == 'COMPANY' else database.Product.get_max_id() + 1
         path = "/FlowImages/" + values.get('type').upper() + "/" + values.get('type') + str(item_id) + ".jpg"
 
         dbx.files_upload(photo_bytes, path)
-        url = dbx.sharing_create_shared_link_with_settings(path).url.replace("www.dropbox.com", "dl.dropboxusercontent.com")
+        url = dbx.sharing_create_shared_link_with_settings(path).url.replace("www.dropbox.com",
+                                                                             "dl.dropboxusercontent.com")
         values.update({'image_link': url})
 
         await run1.add_item_with_dropbox_link(message, values)
