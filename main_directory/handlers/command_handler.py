@@ -11,7 +11,7 @@ router = Router()
 @router.message(CommandStart())
 async def start(message: Message):
     if message.chat.type != 'private':
-        await message.answer("I don't work in groups")
+        await message.answer(f"I don't work in groups {message.chat.id}")
         return
 
     if database.Consumer.is_authenticated(message.from_user.id):

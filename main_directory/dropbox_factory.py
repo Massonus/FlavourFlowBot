@@ -7,8 +7,8 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message
 from dropbox import DropboxOAuth2FlowNoRedirect
 
-import config
-import database_owm as database
+import main_directory.config as config
+import main_directory.database_owm as database
 import main_directory.handlers.output_handler as output
 
 router = Router()
