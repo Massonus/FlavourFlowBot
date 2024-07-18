@@ -40,16 +40,16 @@ class Form(StatesGroup):
     answer = State()
 
 
-async def print_profile_info(message: Message, telegram_id):
+async def print_profile_info(message: Message, telegram_id: int):
     user_profile = database.Consumer.get_by_telegram_id(telegram_id)
-    await bot.send_message(message.chat.id, f'Flavour Flow user information:'
-                                            f'\nUsername: {user_profile.username}'
-                                            f'\nEmail: {user_profile.email}'
-                                            f'\nBonuses: {user_profile.bonuses}')
+    await message.answer(f'Flavour Flow user information:'
+                         f'\nUsername: {user_profile.username}'
+                         f'\nEmail: {user_profile.email}'
+                         f'\nBonuses: {user_profile.bonuses}')
     await main_menu(message, telegram_id)
 
 
-async def print_orders_info(message: Message, telegram_id):
+async def print_orders_info(message: Message, telegram_id: int):
     user_id = database.Consumer.get_by_telegram_id(telegram_id).id
     orders = database.Order.get_all_by_user_id(user_id)
     await message.answer('Your orders:')
@@ -71,82 +71,76 @@ async def print_orders_info(message: Message, telegram_id):
 
 
 async def confirm_delete_product(message: Message, product_id: int):
-    await bot.delete_message(message.chat.id, message.message_id)
+    await message.delete()
     builder = InlineKeyboardBuilder()
     builder.row(
         InlineKeyboardButton(text='✅', callback_data=f'{product_id}-conf-del-prod'),
         InlineKeyboardButton(text='❌', callback_data='deny-delete')
     )
-    await bot.send_message(message.chat.id, 'Do you really want to delete this product?',
-                           reply_markup=builder.as_markup())
+    await message.answer('Do you really want to delete this product?',
+                         reply_markup=builder.as_markup())
 
 
-async def confirm_delete_company(message, company_id):
-    await bot.delete_message(message.chat.id, message.message_id)
+async def confirm_delete_company(message: Message, company_id: int):
+    await message.delete()
     builder = InlineKeyboardBuilder()
     builder.row(
         InlineKeyboardButton(text='✅', callback_data=f'{company_id}-conf-del-comp'),
         InlineKeyboardButton(text='❌', callback_data='deny-delete')
     )
-    await bot.send_message(message.chat.id,
-                           'Do you really want to delete this company? All products inside will be deleted too',
-                           reply_markup=builder.as_markup())
+    await message.answer('Do you really want to delete this company? All products inside will be deleted too',
+                         reply_markup=builder.as_markup())
 
 
-async def delete_product(message, state, product_id):
-    await bot.delete_message(message.chat.id, message.message_id)
-    await database.Product.delete(message, state, bot, product_id)
-    await bot.send_message(message.chat.id, 'Deleted successfully')
+async def delete_product(message: Message, state: FSMContext, product_id: int):
+    await message.delete()
+    await database.Product.delete(message, state, product_id)
 
 
-async def delete_company(message, state, company_id):
-    await bot.delete_message(message.chat.id, message.message_id)
+async def delete_company(message: Message, state: FSMContext, company_id: int):
+    await message.delete()
     await database.Company.delete(message, state, bot, company_id)
 
 
-async def image_question(message, product_category=None, company_id=None):
+async def image_question(message: Message, product_category: str = None, company_id: int = None):
     builder = InlineKeyboardBuilder()
     builder.button(text='DROPBOX', callback_data=f'{product_category}-{company_id}-dropbox')
     builder.button(text='LINK', callback_data=f'{product_category}-{company_id}-link')
     markup = builder.as_markup()
 
-    await bot.send_message(message.chat.id, 'You will upload image from your PC or use link', reply_markup=markup)
+    await message.answer('You will upload image from your PC or use link', reply_markup=markup)
 
 
 @router.message(Form.product_title)
 async def enter_product_title(message: Message, state: FSMContext):
-    # data = await state.get_data()
-    # values = data.get('values', {})
-    # await state.update_data(title=message.text)
     await state.set_state(Form.product_description)
     await message.reply('Enter product title:')
 
 
-async def choose_kitchen_category(message: Message, image_way):
-    await bot.delete_message(message.chat.id, message.message_id)
+async def choose_kitchen_category(message: Message, image_way: str):
+    await message.delete()
     categories = database.Kitchen.get_all()
     builder = InlineKeyboardBuilder()
     for category in categories:
         builder.button(text=category.title, callback_data=f'{category.id}-{image_way}-category')
     markup = builder.as_markup()
-    await bot.send_message(message.chat.id, 'Choose company category:', reply_markup=markup)
+    await message.answer('Choose company category:', reply_markup=markup)
 
 
-async def choose_company_country(message: Message, category_id, image_way):
-    await bot.delete_message(message.chat.id, message.message_id)
+async def choose_company_country(message: Message, category_id: int, image_way: str):
+    await message.delete()
     countries = database.Country.get_all()
     builder = InlineKeyboardBuilder()
     for country in countries:
         builder.add(
             InlineKeyboardButton(text=country.title, callback_data=f'{category_id}-{country.id}-{image_way}-country'))
-    await bot.send_message(message.chat.id, 'Choose company country:', reply_markup=builder.as_markup())
+    await message.answer('Choose company country:', reply_markup=builder.as_markup())
 
 
 @router.message(Form.company_title)
 async def enter_company_title(message: Message, country_id, category_id, image_way, state: FSMContext):
     values = {'type': 'COMPANY', 'image_way': image_way, 'country_id': country_id, 'category_id': category_id}
     await state.update_data(values=values)
-    # await bot.delete_message(message.chat.id, message.message_id)
     await message.reply('Enter company title:')
     await state.set_state(Form.company_description)
 
@@ -157,7 +151,7 @@ async def enter_company_description(message: Message, state: FSMContext):
     values = data.get('values', {})
     values['title'] = message.text
     await state.update_data(title=message.text)
-    await bot.send_message(message.chat.id, 'Enter company description:')
+    await message.answer('Enter company description:')
     await state.set_state(Form.image_link)
 
 
@@ -195,8 +189,6 @@ async def enter_product_price(message: types.Message, state: FSMContext):
 async def send_image_or_link(message: Message, state: FSMContext):
     data = await state.get_data()
     values = data.get('values', {})
-    # values['price'] = message.text
-    # await state.update_data(price=message.text)
     if values.get('type') == 'COMPANY':
         values.update({'description': message.text})
     else:
@@ -248,7 +240,7 @@ async def add_item_with_link(message: Message, state: FSMContext):
     await main_menu(message, message.from_user.id)
 
 
-async def add_item_with_dropbox_link(message: Message, values):
+async def add_item_with_dropbox_link(message: Message, values: dict):
     item_type = values.get('type').lower()
     values.pop('type')
     values.pop('image_way')
@@ -291,15 +283,13 @@ async def enter_login_password(message: types.Message, state: FSMContext):
 async def enter_email(message: types.Message, state: FSMContext):
     username = message.text
     await state.update_data(username=username)
-    # username = message.text
-    # values = {'username': username}
     if not database.Consumer.is_username_already_exists(username) and re.search(r'^[a-zA-Z][a-zA-Z0-9_]*$',
                                                                                 username) is not None:
         await state.set_state(Form.enter_registration_password)
         await message.reply("Enter email")
 
     elif database.Consumer.is_username_already_exists(username):
-        await bot.send_message(message.chat.id, "This username is already in use")
+        await message.reply("This username is already in use")
         await main_menu(message, message.from_user.id)
 
     elif re.search(r'^[a-zA-Z][a-zA-Z0-9_]*$', username) is None:
@@ -329,15 +319,13 @@ async def enter_registration_password(message: types.Message, state: FSMContext)
 async def enter_confirm_password(message: types.Message, state: FSMContext):
     password = message.text
     await state.update_data(password=password)
-    # values.update({'password': password})
     if re.search(r'^(?=.*[a-zA-Z])(?=.*\d)(?=.*[\W_]).{6,15}$', password) is not None:
         await message.reply("Confirm password")
         await state.set_state(Form.confirm_password)
 
     else:
-        await bot.send_message(message.chat.id,
-                               "Password must be 6-15 characters long and contain at least one letter, "
-                               "one digit, and one special character")
+        await message.answer("Password must be 6-15 characters long and contain at least one letter, "
+                             "one digit, and one special character")
         await main_menu(message, message.from_user.id)
 
 
@@ -404,7 +392,6 @@ async def answer_message(callback: CallbackQuery, state: FSMContext):
     question_message_id = int(text_split[2])
     message_id = callback.message.message_id
     await bot.send_message(callback.message.chat.id, "Enter your answer: ")
-    # dp.message.register(send_answer, F.chat.id == callback.message, callback.message, chat_id, message_id, user_id, question_message_id)
     await state.set_state(Form.answer)
     await state.update_data(chat_id=chat_id, user_id=user_id, question_message_id=question_message_id,
                             message_id=message_id)

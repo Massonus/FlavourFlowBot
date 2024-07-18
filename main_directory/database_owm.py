@@ -288,7 +288,7 @@ class Company(Base):
     async def delete_directly(company_id, bot, message, state):
         products = Product.get_all_by_company_id(company_id)
         for product in products:
-            await Product.delete(message=message, bot=bot, product_id=product.id, state=state)
+            await Product.delete(message=message, product_id=product.id, state=state)
 
         company = session.query(Company).filter_by(id=company_id).first()
         title = company.title
@@ -325,22 +325,22 @@ class Product(Base):
         return session.query(Product).filter_by(company_id=company_id).all()
 
     @staticmethod
-    async def delete(message, state, bot, product_id):
+    async def delete(message, state, product_id):
         product = session.query(Product).filter_by(id=product_id).first()
         image_link = product.image_link
         if "dropbox" in image_link:
             values = {'type': 'product', 'id': str(product_id)}
             await dropbox.delete_file(message, state, values)
         else:
-            await Product.delete_directly(product.id, bot, message)
+            await Product.delete_directly(product.id, message)
 
     @staticmethod
-    async def delete_directly(product_id, bot, message):
+    async def delete_directly(product_id, message):
         product = session.query(Product).filter_by(id=product_id).first()
         title = product.title
         session.delete(product)
         session.commit()
-        await bot.send_message(message.chat.id, f'Product: {title} deleted successfully')
+        await message.answer(f'Product: "{title}" deleted successfully')
         return True
 
     @staticmethod

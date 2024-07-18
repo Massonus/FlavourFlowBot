@@ -87,7 +87,7 @@ async def products_catalog(callback: CallbackQuery):
         product, count = database.Product.get_for_catalog(company_id, page, skip_size=1)
 
         buttons = [
-            [InlineKeyboardButton(text='Return to main_directory menu', callback_data='main_directory menu')],
+            [InlineKeyboardButton(text='Return to main menu', callback_data='main menu')],
             [InlineKeyboardButton(text='Back to companies', callback_data=f"{company_page}-companies")]
         ]
 

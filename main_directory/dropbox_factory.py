@@ -97,7 +97,7 @@ async def delete_file(message: Message, state: FSMContext, values: dict):
         if values.get('type').upper() == 'COMPANY':
             await database.Company.delete_directly(int(values.get('id')), bot, message, state)
         else:
-            await database.Product.delete_directly(int(values.get('id')), bot, message)
+            await database.Product.delete_directly(int(values.get('id')), message)
     except AttributeError:
         print("Waiting oauth...")
     except dropbox.exceptions.ApiError as error:
