@@ -4,7 +4,7 @@ from aiogram.types import (CallbackQuery)
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 import main_directory.database_owm as database
-import main_directory.run1 as run1
+import main_directory.handlers.input_handler as run1
 import main_directory.handlers.output_handler as output
 from main_directory.handlers.display_handler import main_menu, products_catalog, companies_catalog
 

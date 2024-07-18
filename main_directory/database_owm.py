@@ -458,7 +458,9 @@ class Consumer(Base):
         values.update(
             {'password': bcrypt.hash(values.get('password')), 'bonuses': 0, 'redactor': 'telegram registration',
              'id': user_id})
-        consumer = Consumer(**values)
+        consumer = Consumer(username=values.get('username'), email=values.get('email'), password=values.get('password'),
+                            telegram_id=values.get('telegram_id'), bonuses=0, redactor='telegram registration',
+                            id=values.get('id'))
         session.add(consumer)
         change_sequence(Consumer.__tablename__, user_id)
         session.commit()

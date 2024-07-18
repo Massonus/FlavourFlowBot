@@ -3,7 +3,7 @@ from aiogram.filters import Command, CommandStart
 from aiogram.types import (Message)
 
 import main_directory.database_owm as database
-from main_directory.run1 import main_menu
+from main_directory.handlers.input_handler import main_menu
 
 router = Router()
 

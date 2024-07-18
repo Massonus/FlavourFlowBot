@@ -7,9 +7,9 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import (Message)
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-import database_owm as database
-import dropbox_factory as dropbox
-from config import GROUP_ID, TG_TOKEN
+import main_directory.database_owm as database
+import main_directory.dropbox_factory as dropbox
+from main_directory.config import GROUP_ID, TG_TOKEN
 from main_directory.handlers.display_handler import main_menu
 
 logging.basicConfig(level=logging.INFO)
@@ -281,5 +281,5 @@ async def send_answer(message: Message, state: FSMContext):
     await state.clear()
 
 
-def register_run1_handlers(dp):
+def register_input_handlers(dp):
     dp.include_router(router)

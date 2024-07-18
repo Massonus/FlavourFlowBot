@@ -7,7 +7,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 import main_directory.database_owm as database
 from main_directory.config import TG_TOKEN, GROUP_ID
 from main_directory.handlers.display_handler import main_menu
-from main_directory.run1 import Form
+from main_directory.handlers.input_handler import Form
 
 bot = Bot(token=TG_TOKEN)
 
