@@ -1,12 +1,14 @@
 import asyncio
+import logging
 import traceback
 
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 
 import database_owm as database
-from main_directory.handlers.command_handler import register_command_handlers
 from config import ADMIN_ID, ADMIN2_ID, TG_TOKEN
+from main_directory.handlers.command_handler import register_command_handlers
+from run1 import register_run1_handlers
 
 API_TOKEN = TG_TOKEN
 
@@ -19,12 +21,14 @@ async def send_alarm(bot: Bot, admin_id: int, message: str):
 
 
 async def main():
+    logging.basicConfig(level=logging.INFO)
     bot = Bot(token=API_TOKEN)
     dp = Dispatcher(storage=MemoryStorage())
     while True:
         try:
             # Регистрируем обработчики из других модулей
             register_command_handlers(dp)
+            register_run1_handlers(dp)
 
             # Запускаем polling для получения обновлений от Telegram
             await dp.start_polling(bot)

@@ -1,26 +1,21 @@
+import logging
 import re
-from time import sleep
-import traceback
-import asyncio
-from aiogram import Router, Bot, Dispatcher, types, F
-from aiogram.filters import Command, CommandStart
-from aiogram.fsm.storage.memory import MemoryStorage
+
+from aiogram import Router, Bot, types
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
-from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.types import (InlineKeyboardMarkup, InlineKeyboardButton,
-                           Message, CallbackQuery, ReplyKeyboardMarkup, KeyboardButton)
-import logging
+                           Message, CallbackQuery)
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+
 import database_owm as database
 import dropbox_factory as dropbox
-from config import GROUP_ID, TG_TOKEN, ADMIN_ID, ADMIN2_ID
+from config import GROUP_ID, TG_TOKEN
 
 logging.basicConfig(level=logging.INFO)
 
 bot = Bot(token=TG_TOKEN)
-dp = Dispatcher(storage=MemoryStorage())
 router = Router()
-dp.include_router(router)
 
 
 class Form(StatesGroup):
@@ -44,11 +39,15 @@ class Form(StatesGroup):
     answer = State()
 
 
+async def global_state_handler(state: FSMContext, state_value):
+    await state.set_state(state_value)
+
+
 @router.callback_query(lambda call: True)
 async def process_callback(callback_query: CallbackQuery, state: FSMContext):
     data = callback_query.data
     user_id = callback_query.from_user.id
-    chat_id = callback_query.message.chat.id
+    message = callback_query.message
 
     if "answer" in data:
         await answer_message(callback_query, state)
@@ -64,11 +63,11 @@ async def process_callback(callback_query: CallbackQuery, state: FSMContext):
 
     elif "add-basket" in data:
         product_id = int(data.split('-')[0])
-        await bot.send_message(chat_id, database.BasketObject.add_new(product_id, user_id))
+        await message.answer(database.BasketObject.add_new(product_id, user_id))
 
     elif "add-wish" in data:
         product_id = int(data.split('-')[0])
-        await bot.send_message(chat_id, database.WishObject.add_new(product_id, user_id))
+        await message.answer(database.WishObject.add_new(product_id, user_id))
 
     elif data == "profile":
         await print_profile_info(callback_query.message, callback_query.from_user.id)
@@ -76,48 +75,48 @@ async def process_callback(callback_query: CallbackQuery, state: FSMContext):
     elif data == "orders":
         await print_orders_info(callback_query.message, callback_query.from_user.id)
 
-    elif data == "main_directory menu":
-        await bot.delete_message(chat_id, callback_query.message.message_id)
+    elif data == "main menu":
+        await message.delete()
         await main_menu(callback_query.message, callback_query.from_user.id)
 
     elif data == "login":
-        await bot.delete_message(chat_id, callback_query.message.message_id)
-        await state.set_state(Form.enter_login_password)
-        await bot.send_message(chat_id, 'Enter your username from Flavour Flow site')
+        await message.delete()
+        await global_state_handler(state, Form.enter_login_password)
+        await message.answer('Enter your username from Flavour Flow site')
 
     elif data == "register":
-        await bot.delete_message(chat_id, callback_query.message.message_id)
+        await message.delete()
         await state.set_state(Form.enter_email)
-        await bot.send_message(chat_id, 'Enter your username')
+        await message.reply('Enter your username')
 
     elif data == "help":
         if not database.PendingUser.is_pending(user_id):
-            await bot.send_message(chat_id, 'Enter your question')
+            await message.answer('Enter your question')
             await state.set_state(Form.question)
         else:
-            await bot.send_message(chat_id, 'You have already sent a message, please wait an answer')
+            await message.answer('You have already sent a message, please wait an answer')
 
     if "add product" in data:
         company_id = int(data.split('-')[0])
-        await bot.delete_message(chat_id, callback_query.message.message_id)
+        await message.delete()
         markup = InlineKeyboardBuilder()
         markup.button(text='MEAL', callback_data=f'{company_id}-meal')
         markup.button(text='DRINK', callback_data=f'{company_id}-drink')
         markup.adjust(1, 1)
-        await bot.send_message(chat_id, 'Choose product category', reply_markup=markup.as_markup())
+        await message.answer('Choose product category', reply_markup=markup.as_markup())
 
     elif "add company" in data:
-        await bot.delete_message(chat_id, callback_query.message.message_id)
+        await message.delete()
         await image_question(callback_query.message)
 
     elif "meal" in data:
         company_id = int(data.split('-')[0])
-        await bot.delete_message(chat_id, callback_query.message.message_id)
+        await message.delete()
         await image_question(callback_query.message, "MEAL", company_id)
 
     elif "drink" in data:
         company_id = int(data.split('-')[0])
-        await bot.delete_message(chat_id, callback_query.message.message_id)
+        await message.delete()
         await image_question(callback_query.message, "DRINK", company_id)
 
     elif "dropbox" in data:
@@ -173,7 +172,7 @@ async def process_callback(callback_query: CallbackQuery, state: FSMContext):
         await delete_company(callback_query.message, company_id)
 
     elif "deny-delete" in data:
-        await bot.delete_message(chat_id, callback_query.message.message_id)
+        await message.delete()
         await main_menu(callback_query.message, callback_query.from_user.id)
 
 
@@ -593,7 +592,7 @@ async def companies_catalog(callback: CallbackQuery):
     company, count = database.Company.get_for_catalog(page, skip_size=1)  # skip_size - display by one element
 
     buttons = [
-        [InlineKeyboardButton(text='Return to main_directory menu', callback_data='main_directory menu')],
+        [InlineKeyboardButton(text='Return to main menu', callback_data='main menu')],
         [InlineKeyboardButton(text='Products of this company', callback_data=f"1-{company.id}-{page}-products")]
     ]
 
@@ -698,3 +697,6 @@ async def products_catalog(callback: CallbackQuery):
                                    "Wait until administrator add products")
             await main_menu(callback.message, callback.from_user.id)
 
+
+def register_run1_handlers(dp):
+    dp.include_router(router)
