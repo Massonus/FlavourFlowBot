@@ -5,7 +5,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 import main_directory.database_owm as database
 import main_directory.run1 as run1
-from main_directory.handlers.display_handler import main_menu
+from main_directory.handlers.display_handler import main_menu, products_catalog, companies_catalog
 
 Form = run1.Form
 
@@ -26,10 +26,10 @@ async def process_callback(callback_query: CallbackQuery, state: FSMContext):
             await run1.ignore_message(callback_query)
 
         case _ if "companies" in data:
-            await run1.companies_catalog(callback_query)
+            await companies_catalog(callback_query)
 
         case _ if "products" in data:
-            await run1.products_catalog(callback_query)
+            await products_catalog(callback_query)
 
         case _ if "add-basket" in data:
             product_id = int(data.split('-')[0])
