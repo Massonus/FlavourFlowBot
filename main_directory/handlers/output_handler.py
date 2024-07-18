@@ -1,3 +1,5 @@
+import traceback
+
 from aiogram import Bot
 from aiogram.fsm.context import FSMContext
 from aiogram.types import (InlineKeyboardButton,
@@ -136,3 +138,13 @@ async def ignore_message(callback: CallbackQuery):
     await bot.send_message(chat_id, "Unfortunately, your question was denied", reply_to_message_id=question_message_id)
     await bot.delete_message(GROUP_ID, message_id)
     database.PendingUser.delete_pending(user_id)
+
+
+async def send_alarm(admin_id: int, error):
+    traceback_str = ''.join(traceback.format_tb(error.__traceback__))
+    alarm_message = (f"<b>ALARM!!! ALARM!!! THE PROBLEM DETECTED!!!:</b>\n"
+                     f"{traceback_str}")
+    try:
+        await bot.send_message(admin_id, alarm_message, parse_mode='html')
+    except Exception as e:
+        print(f"Failed to send message to {admin_id}: {e}")
