@@ -47,5 +47,5 @@ async def command_help(message: Message):
         await main_menu(message, message.from_user.id)
 
 
-def register_command_handlers(dp):
+def register_command_handler(dp):
     dp.include_router(router)

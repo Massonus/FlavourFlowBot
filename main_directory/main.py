@@ -9,8 +9,8 @@ import database_owm as database
 from config import ADMIN_ID, ADMIN2_ID, TG_TOKEN
 from dropbox_factory import register_dropbox_factory
 from main_directory.handlers.callback_handler import register_callback_handlers
-from main_directory.handlers.command_handler import register_command_handlers
-from main_directory.handlers.input_handler import register_input_handlers
+from main_directory.handlers.command_handler import register_command_handler
+from main_directory.handlers.input_handler import register_input_handler
 
 API_TOKEN = TG_TOKEN
 
@@ -28,8 +28,8 @@ async def main():
     dp = Dispatcher(storage=MemoryStorage())
     while True:
         try:
-            register_command_handlers(dp)
-            register_input_handlers(dp)
+            register_command_handler(dp)
+            register_input_handler(dp)
             register_callback_handlers(dp)
             register_dropbox_factory(dp)
 

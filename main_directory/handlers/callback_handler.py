@@ -4,11 +4,11 @@ from aiogram.types import (CallbackQuery)
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 import main_directory.database_owm as database
-import main_directory.handlers.input_handler as run1
+import main_directory.handlers.input_handler as input_handler
 import main_directory.handlers.output_handler as output
 from main_directory.handlers.display_handler import main_menu, products_catalog, companies_catalog
 
-Form = run1.Form
+Form = input_handler.Form
 
 router = Router()
 
@@ -98,7 +98,7 @@ async def process_callback(callback_query: CallbackQuery, state: FSMContext):
                           'company_id': company_id}
                 await state.update_data(values=values)
                 await state.set_state(Form.product_title)
-                await run1.enter_product_title(callback_query.message, state)
+                await input_handler.enter_product_title(callback_query.message, state)
             except ValueError:
                 await output.choose_kitchen_category(callback_query.message, 'DROPBOX')
 
@@ -110,7 +110,7 @@ async def process_callback(callback_query: CallbackQuery, state: FSMContext):
                           'company_id': company_id}
                 await state.update_data(values=values)
                 await state.set_state(Form.product_title)
-                await run1.enter_product_title(callback_query.message, state)
+                await input_handler.enter_product_title(callback_query.message, state)
             except ValueError:
                 await output.choose_kitchen_category(callback_query.message, 'LINK')
 
@@ -124,7 +124,7 @@ async def process_callback(callback_query: CallbackQuery, state: FSMContext):
             country_id = int(data.split('-')[1])
             image_way = data.split('-')[2]
             await state.set_state(Form.company_title)
-            await run1.enter_company_title(callback_query.message, category_id, country_id, image_way, state)
+            await input_handler.enter_company_title(callback_query.message, category_id, country_id, image_way, state)
 
         case _ if "delete-product" in data:
             product_id = int(data.split('-')[0])

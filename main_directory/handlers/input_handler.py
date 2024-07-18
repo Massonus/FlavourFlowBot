@@ -281,5 +281,5 @@ async def send_answer(message: Message, state: FSMContext):
     await state.clear()
 
 
-def register_input_handlers(dp):
+def register_input_handler(dp):
     dp.include_router(router)
