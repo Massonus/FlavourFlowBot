@@ -1,3 +1,5 @@
+from aiogram.fsm.context import FSMContext
+from aiogram.types import (Message)
 from passlib.hash import bcrypt
 from sqlalchemy import (create_engine, Column, Integer, BigInteger,
                         Sequence, Double, Text, ForeignKey,
@@ -30,7 +32,7 @@ class AccessToken(Base):
         return session.query(AccessToken).first()
 
     @staticmethod
-    def update_token(value):
+    def update_token(value: str):
         try:
             access_token = AccessToken.get_token()
             session.delete(access_token)
@@ -46,7 +48,7 @@ class Basket(Base):
     user_id = Column(BigInteger, ForeignKey('consumer.id'))
 
     @staticmethod
-    def get_by_user_id(user_id):
+    def get_by_user_id(user_id: int):
         return session.query(Basket).filter_by(user_id=user_id).first()
 
     @staticmethod
@@ -54,7 +56,7 @@ class Basket(Base):
         return session.query(func.max(Basket.id)).first()[0]
 
     @staticmethod
-    def add_new(user_id):
+    def add_new(user_id: int):
         basket_id = Basket.get_max_id() + 1
         session.add(Basket(id=basket_id, user_id=user_id))
         change_sequence(Basket.__tablename__, basket_id)
@@ -84,7 +86,7 @@ class BasketObject(Base):
         return result if result is not None else 0
 
     @staticmethod
-    def add_new(product_id, telegram_id):
+    def add_new(product_id: int, telegram_id: int):
         user_id = Consumer.get_by_telegram_id(telegram_id).id
         basket_object = BasketObject.get_by_product_and_user_id(product_id, user_id)
 
@@ -118,7 +120,7 @@ class Wish(Base):
     user_id = Column(BigInteger, ForeignKey('consumer.id'))
 
     @staticmethod
-    def get_by_user_id(user_id):
+    def get_by_user_id(user_id: int):
         return session.query(Wish).filter_by(user_id=user_id).first()
 
     @staticmethod
@@ -126,7 +128,7 @@ class Wish(Base):
         return session.query(func.max(Wish.id)).first()[0]
 
     @staticmethod
-    def add_new(user_id):
+    def add_new(user_id: int):
         wish_id = Wish.get_max_id() + 1
         session.add(Wish(id=wish_id, user_id=user_id))
         change_sequence(Wish.__tablename__, wish_id)
@@ -154,7 +156,7 @@ class WishObject(Base):
                                                WishObject.user_id == user_id).first()
 
     @staticmethod
-    def add_new(product_id, telegram_id):
+    def add_new(product_id: int, telegram_id: int):
         user_id = Consumer.get_by_telegram_id(telegram_id).id
         wish_object = WishObject.get_by_product_and_user_id(product_id, user_id)
 
@@ -193,11 +195,11 @@ class Order(Base):
     company_id = Column(BigInteger, ForeignKey('company.id'))
 
     @staticmethod
-    def get_by_id(kitchen_id):
+    def get_by_id(kitchen_id: int):
         return session.query(Kitchen).filter_by(id=kitchen_id).first()
 
     @staticmethod
-    def get_all_by_user_id(user_id):
+    def get_all_by_user_id(user_id: int):
         return session.query(Order).filter_by(user_id=user_id).all()
 
 
@@ -219,7 +221,7 @@ class Country(Base):
     title = Column(String(255))
 
     @staticmethod
-    def get_by_id(country_id):
+    def get_by_id(country_id: int):
         return session.query(Country).filter_by(id=country_id).first()
 
     @staticmethod
@@ -233,7 +235,7 @@ class Kitchen(Base):
     title = Column(String(255))
 
     @staticmethod
-    def get_by_id(kitchen_id):
+    def get_by_id(kitchen_id: int):
         return session.query(Kitchen).filter_by(id=kitchen_id).first()
 
     @staticmethod
@@ -252,11 +254,11 @@ class Company(Base):
     country_id = Column(BigInteger, ForeignKey('company_country.id'))
 
     @staticmethod
-    def get_company_by_id(company_id):
+    def get_company_by_id(company_id: int):
         return session.query(Company).filter_by(id=company_id).first()
 
     @staticmethod
-    def get_for_catalog(page=1, skip_size=1):
+    def get_for_catalog(page: int = 1, skip_size: int = 1):
         skips_page = (page - 1) * skip_size
         company_count = session.query(Company).count()
         return session.query(Company).order_by(Company.title).offset(skips_page).limit(skip_size).first(), company_count
@@ -266,7 +268,7 @@ class Company(Base):
         return session.query(func.max(Company.id)).first()[0]
 
     @staticmethod
-    def add_new(values):
+    def add_new(values: dict):
         company_id = Company.get_max_id() + 1
         values.update({'rating': None, 'id': company_id})
         session.add(Company(**values))
@@ -274,7 +276,7 @@ class Company(Base):
         session.commit()
 
     @staticmethod
-    async def delete(message, state, company_id):
+    async def delete(message: Message, state: FSMContext, company_id: int):
         company = session.query(Company).filter_by(id=company_id).first()
         image_link = company.image_link
 
@@ -285,7 +287,7 @@ class Company(Base):
             await Company.delete_directly(company_id, message, state)
 
     @staticmethod
-    async def delete_directly(company_id, message, state):
+    async def delete_directly(company_id: int, message: Message, state: FSMContext):
         products = Product.get_all_by_company_id(company_id)
         for product in products:
             await Product.delete(message=message, product_id=product.id, state=state)
@@ -310,22 +312,22 @@ class Product(Base):
     company_id = Column(BigInteger, ForeignKey('company.id'))
 
     @staticmethod
-    def get_by_id(product_id):
+    def get_by_id(product_id: int):
         return session.query(Product).filter_by(id=product_id).first()
 
     @staticmethod
-    def get_for_catalog(company_id, page=1, skip_size=1):
+    def get_for_catalog(company_id, page: int = 1, skip_size: int = 1):
         skips_page = (page - 1) * skip_size
         product_count = session.query(Product).where(Product.company_id == company_id).count()
         return session.query(Product).where(Product.company_id == company_id).order_by(Product.title).offset(
             skips_page).limit(skip_size).first(), product_count
 
     @staticmethod
-    def get_all_by_company_id(company_id):
+    def get_all_by_company_id(company_id: int):
         return session.query(Product).filter_by(company_id=company_id).all()
 
     @staticmethod
-    async def delete(message, state, product_id):
+    async def delete(message: Message, state: FSMContext, product_id: int):
         product = session.query(Product).filter_by(id=product_id).first()
         image_link = product.image_link
         if "dropbox" in image_link:
@@ -335,7 +337,7 @@ class Product(Base):
             await Product.delete_directly(product.id, message)
 
     @staticmethod
-    async def delete_directly(product_id, message):
+    async def delete_directly(product_id: int, message: Message):
         product = session.query(Product).filter_by(id=product_id).first()
         title = product.title
         session.delete(product)
@@ -396,27 +398,27 @@ class Consumer(Base):
     telegram_id = Column(BigInteger)
 
     @staticmethod
-    def get_user_by_id(user_id):
+    def get_user_by_id(user_id: int):
         result = session.query(Consumer).filter_by(id=user_id).first()
         return result if result is not None else Consumer(username="Unauthorized")
 
     @staticmethod
-    def get_by_telegram_id(telegram_id):
+    def get_by_telegram_id(telegram_id: int):
         result = session.query(Consumer).filter_by(telegram_id=telegram_id).first()
         return result if result is not None else Consumer(username="Unauthorized")
 
     @staticmethod
-    def get_by_username(username):
+    def get_by_username(username: str):
         result = session.query(Consumer).filter_by(username=username).first()
         return result if result is not None else Consumer(username="Unauthorized")
 
     @staticmethod
-    def is_authenticated(telegram_id):
+    def is_authenticated(telegram_id: int):
         result = session.query(Consumer).filter_by(telegram_id=telegram_id).first()
         return True if result is not None else False
 
     @staticmethod
-    def is_admin(telegram_id):
+    def is_admin(telegram_id: int):
         if Consumer.is_authenticated(telegram_id):
             result = session.query(Consumer).filter_by(telegram_id=telegram_id).first()
             role = session.query(UserRole).filter_by(user_id=result.id).first()
@@ -425,7 +427,7 @@ class Consumer(Base):
             return False
 
     @staticmethod
-    def verify_password(username, password):
+    def verify_password(username: str, password: str):
         user = Consumer.get_by_username(username)
         try:
             return bcrypt.verify(password, user.password)
@@ -433,18 +435,18 @@ class Consumer(Base):
             return False
 
     @staticmethod
-    def change_telegram_id(username, telegram_id):
+    def change_telegram_id(username: str, telegram_id: int):
         consumer = session.query(Consumer).filter_by(username=username).first()
         consumer.telegram_id = telegram_id
         session.commit()
 
     @staticmethod
-    def is_username_already_exists(username):
+    def is_username_already_exists(username: str):
         result = session.query(Consumer).filter_by(username=username).first()
         return True if result is not None else False
 
     @staticmethod
-    def is_email_already_exists(email):
+    def is_email_already_exists(email: str):
         result = session.query(Consumer).filter_by(email=email).first()
         return True if result is not None else False
 
@@ -453,7 +455,7 @@ class Consumer(Base):
         return session.query(func.max(Consumer.id)).first()[0]
 
     @staticmethod
-    def add_new(values):
+    def add_new(values: dict):
         user_id = Consumer.get_max_id() + 1
         values.update(
             {'password': bcrypt.hash(values.get('password')), 'bonuses': 0, 'redactor': 'telegram registration',
@@ -481,19 +483,19 @@ class PendingUser(Base):
         return result if result is not None else 0
 
     @staticmethod
-    def is_pending(telegram_id):
+    def is_pending(telegram_id: int):
         result = session.query(PendingUser).filter_by(telegram_id=telegram_id).first()
         return True if result is not None else False
 
     @staticmethod
-    def add_new_pending(telegram_id):
+    def add_new_pending(telegram_id: int):
         pending_id = PendingUser.get_max_id() + 1
         pending = PendingUser(id=pending_id, telegram_id=telegram_id)
         session.add(pending)
         session.commit()
 
     @staticmethod
-    def delete_pending(telegram_id):
+    def delete_pending(telegram_id: int):
         pending = session.query(PendingUser).filter_by(telegram_id=int(telegram_id)).first()
         session.delete(pending)
         session.commit()
@@ -505,17 +507,17 @@ class UserRole(Base):
     roles = Column(String(255))
 
     @staticmethod
-    def get_by_user_id(user_id):
+    def get_by_user_id(user_id: int):
         return session.query(UserRole).filter_by(user_id=user_id).first()
 
     @staticmethod
-    def add_new(user_id):
+    def add_new(user_id: int):
         new = UserRole(user_id=user_id, roles="USER")
         session.add(new)
         session.commit()
 
 
-def change_sequence(table, value):
+def change_sequence(table: str, value: int):
     sql = text(f"SELECT setval('public.{table.lower()}_seq', {value}, true);")
     engine.connect().execute(sql)
     session.commit()
