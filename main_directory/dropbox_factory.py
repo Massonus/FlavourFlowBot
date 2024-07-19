@@ -19,7 +19,7 @@ class Form(StatesGroup):
     after_init = State()
 
 
-async def dbx_init_token(message: Message, photo_bytes, values, state: FSMContext):
+async def dbx_init_token(message: Message, photo_bytes: bytes, values: dict, state: FSMContext):
     auth_flow = DropboxOAuth2FlowNoRedirect(config.APP_KEY, config.APP_SECRET)
 
     authorize_url = auth_flow.start()
