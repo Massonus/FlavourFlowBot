@@ -364,8 +364,8 @@ class Rating(Base):
     company_id = Column(BigInteger, ForeignKey('company.id'))
 
 
-class Message(Base):
-    __tablename__ = 'message'
+class Comment(Base):
+    __tablename__ = 'comment'
     id = Column(BigInteger, primary_key=True)
     text = Column(String(255))
     comment_time = Column(DateTime)
@@ -373,16 +373,16 @@ class Message(Base):
     item_id = Column(BigInteger)
 
 
-class MessageLike(Base):
-    __tablename__ = 'message_like'
-    message_id = Column(BigInteger, ForeignKey('message.id'), primary_key=True)
+class CommentLike(Base):
+    __tablename__ = 'comment_like'
+    message_id = Column(BigInteger, ForeignKey('comment.id'), primary_key=True)
     user_id = Column(BigInteger, ForeignKey('consumer.id'), primary_key=True)
 
 
-class CompanyMessage(Base):
-    __tablename__ = 'company_message'
+class CompanyComment(Base):
+    __tablename__ = 'company_comment'
     company_id = Column(BigInteger, ForeignKey('company.id'), primary_key=True)
-    message_id = Column(BigInteger, ForeignKey('message.id'), primary_key=True)
+    message_id = Column(BigInteger, ForeignKey('comment.id'), primary_key=True)
 
 
 class Consumer(Base):
