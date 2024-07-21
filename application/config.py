@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 import os
 
 # download secrets from .env file that should be in the main directory
-dotenv_path = os.path.join(os.path.dirname(__file__), '..', 'deploy.env')
+dotenv_path = os.path.join(os.path.dirname(__file__), '..', 'dev.env')
 load_dotenv(dotenv_path=dotenv_path)
 
 APP_KEY = os.getenv("APP_KEY")
