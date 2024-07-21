@@ -9,7 +9,7 @@ from sqlalchemy.orm import sessionmaker, declarative_base, exc
 import main_directory.config as config
 import main_directory.dropbox_factory as dropbox
 
-engine = create_engine(config.initialize_engine)
+engine = create_engine(config.INITIALIZE_ENGINE)
 
 Session = sessionmaker(bind=engine)
 Base = declarative_base()

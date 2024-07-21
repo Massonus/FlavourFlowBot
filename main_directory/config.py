@@ -1,10 +1,9 @@
 from dotenv import load_dotenv
 import os
 
-# download secrets from .env file
-load_dotenv()
+# download secrets from .env file that should be in the main directory
+load_dotenv(dotenv_path="../dev.env")
 
-# Test settings
 APP_KEY = os.getenv("APP_KEY")
 APP_SECRET = os.getenv("APP_SECRET")
 POSTGRES_USERNAME = os.getenv("POSTGRES_USERNAME")
@@ -19,11 +18,4 @@ TG_TOKEN = os.getenv("TG_TOKEN")
 GROUP_ID = int(os.getenv("GROUP_ID"))
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
 ADMIN2_ID = int(os.getenv("ADMIN2_ID"))
-
-# local dev engine use your local database
-initialize_engine = (f"postgresql+psycopg://{POSTGRES_USERNAME}:{POSTGRES_TEST_PASSWORD}@"
-                     f"{POSTGRES_TEST_HOST}:5432/{POSTGRES_PRACTICE_DATABASE}")
-
-# host engine
-# initialize_engine = (f"postgresql+psycopg://{POSTGRES_USERNAME}:{POSTGRES_PASSWORD}"
-#                      f"@{POSTGRES_HOST}:5432/{POSTGRES_DATABASE}")
+INITIALIZE_ENGINE = os.getenv("INITIALIZE_ENGINE")
