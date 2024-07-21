@@ -490,7 +490,7 @@ class PendingUser(Base):
 
     @staticmethod
     def delete_pending(telegram_id: int):
-        pending = session.query(PendingUser).filter_by(telegram_id=int(telegram_id)).first()
+        pending = session.query(PendingUser).filter_by(telegram_id=telegram_id).first()
         session.delete(pending)
         session.commit()
 
