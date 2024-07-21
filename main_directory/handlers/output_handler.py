@@ -137,7 +137,7 @@ async def ignore_message(callback: CallbackQuery):
     message_id = callback.message.message_id
     await bot.send_message(chat_id, "Unfortunately, your question was denied", reply_to_message_id=question_message_id)
     await bot.delete_message(GROUP_ID, message_id)
-    database.PendingUser.delete_pending(user_id)
+    database.PendingUser.delete_pending(int(user_id))
 
 
 async def send_alarm(admin_id: int, error):

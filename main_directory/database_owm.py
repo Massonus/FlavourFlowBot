@@ -9,13 +9,7 @@ from sqlalchemy.orm import sessionmaker, declarative_base, exc
 import main_directory.config as config
 import main_directory.dropbox_factory as dropbox
 
-engine = create_engine(
-    f"postgresql+psycopg://{config.postgres_username}:{config.postgres_test_password}@{config.postgres_test_host}:5432"
-    f"/{config.postgres_practice_database}")
-
-# engine = create_engine(
-#     f"postgresql+psycopg://{config.postgres_username}:{config.postgres_password}@{config.postgres_host}:5432"
-#     f"/{config.postgres_database}")
+engine = create_engine(config.INITIALIZE_ENGINE)
 
 Session = sessionmaker(bind=engine)
 Base = declarative_base()
@@ -327,7 +321,7 @@ class Product(Base):
         return session.query(Product).filter_by(company_id=company_id).all()
 
     @staticmethod
-    async def delete(message: Message, state: FSMContext, product_id: int):
+    async def delete(message: Message, state: FSMContext, product_id):
         product = session.query(Product).filter_by(id=product_id).first()
         image_link = product.image_link
         if "dropbox" in image_link:
@@ -496,7 +490,7 @@ class PendingUser(Base):
 
     @staticmethod
     def delete_pending(telegram_id: int):
-        pending = session.query(PendingUser).filter_by(telegram_id=int(telegram_id)).first()
+        pending = session.query(PendingUser).filter_by(telegram_id=telegram_id).first()
         session.delete(pending)
         session.commit()
 

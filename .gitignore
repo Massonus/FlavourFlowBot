@@ -67,7 +67,6 @@ instance/
 
 # Scrapy stuff:
 .scrapy
-main_directory/config.py
 
 # Sphinx documentation
 docs/_build/
@@ -124,6 +123,8 @@ celerybeat.pid
 
 # Environments
 .env
+deploy.env
+dev.env
 .venv
 env/
 venv/
