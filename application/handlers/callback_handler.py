@@ -3,10 +3,10 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import (CallbackQuery)
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-import main_directory.database_owm as database
-import main_directory.handlers.input_handler as input_handler
-import main_directory.handlers.output_handler as output
-from main_directory.handlers.display_handler import main_menu, products_catalog, companies_catalog
+import application.database_owm as database
+import application.handlers.input_handler as input_handler
+import application.handlers.output_handler as output
+from application.handlers.display_handler import main_menu, products_catalog, companies_catalog
 
 Form = input_handler.Form
 

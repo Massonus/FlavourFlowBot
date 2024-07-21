@@ -7,10 +7,10 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import (Message)
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-import main_directory.database_owm as database
-import main_directory.dropbox_factory as dropbox
-from main_directory.config import GROUP_ID, TG_TOKEN
-from main_directory.handlers.display_handler import main_menu
+import application.database_owm as database
+import application.dropbox_factory as dropbox
+from application.config import GROUP_ID, TG_TOKEN
+from application.handlers.display_handler import main_menu
 
 logging.basicConfig(level=logging.INFO)
 

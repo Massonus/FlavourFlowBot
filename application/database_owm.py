@@ -6,8 +6,8 @@ from sqlalchemy import (create_engine, Column, Integer, BigInteger,
                         String, func, Date, text, Time, DateTime)
 from sqlalchemy.orm import sessionmaker, declarative_base, exc
 
-import main_directory.config as config
-import main_directory.dropbox_factory as dropbox
+import application.config as config
+import application.dropbox_factory as dropbox
 
 engine = create_engine(config.INITIALIZE_ENGINE)
 

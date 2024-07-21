@@ -3,8 +3,8 @@ from aiogram.types import (CallbackQuery)
 from aiogram.types import (InlineKeyboardMarkup, InlineKeyboardButton,
                            Message)
 
-import main_directory.database_owm as database
-from main_directory.config import TG_TOKEN
+import application.database_owm as database
+from application.config import TG_TOKEN
 
 bot = Bot(token=TG_TOKEN)
 
