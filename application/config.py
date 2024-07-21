@@ -2,7 +2,8 @@ from dotenv import load_dotenv
 import os
 
 # download secrets from .env file that should be in the main directory
-load_dotenv(dotenv_path="../dev.env")
+dotenv_path = os.path.join(os.path.dirname(__file__), '..', 'deploy.env')
+load_dotenv(dotenv_path=dotenv_path)
 
 APP_KEY = os.getenv("APP_KEY")
 APP_SECRET = os.getenv("APP_SECRET")
@@ -15,7 +16,7 @@ POSTGRES_TEST_DATABASE = os.getenv("POSTGRES_TEST_DATABASE")
 POSTGRES_PRACTICE_DATABASE = os.getenv("POSTGRES_PRACTICE_DATABASE")
 POSTGRES_DATABASE = os.getenv("POSTGRES_DATABASE")
 TG_TOKEN = os.getenv("TG_TOKEN")
-GROUP_ID = int(os.getenv("GROUP_ID"))
-ADMIN_ID = int(os.getenv("ADMIN_ID"))
-ADMIN2_ID = int(os.getenv("ADMIN2_ID"))
+GROUP_ID = os.getenv("GROUP_ID")
+ADMIN_ID = os.getenv("ADMIN_ID")
+ADMIN2_ID = os.getenv("ADMIN2_ID")
 INITIALIZE_ENGINE = os.getenv("INITIALIZE_ENGINE")

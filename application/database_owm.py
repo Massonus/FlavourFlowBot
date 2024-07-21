@@ -6,10 +6,10 @@ from sqlalchemy import (create_engine, Column, Integer, BigInteger,
                         String, func, Date, text, Time, DateTime)
 from sqlalchemy.orm import sessionmaker, declarative_base, exc
 
-import application.config as config
+from application.config import INITIALIZE_ENGINE
 import application.dropbox_factory as dropbox
 
-engine = create_engine(config.INITIALIZE_ENGINE)
+engine = create_engine(INITIALIZE_ENGINE)
 
 Session = sessionmaker(bind=engine)
 Base = declarative_base()
