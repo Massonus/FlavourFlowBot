@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 import os
 
-# Загрузить переменные окружения из .env файла
+# download secrets from .env file
 load_dotenv()
 
 # Test settings
@@ -20,7 +20,10 @@ GROUP_ID = int(os.getenv("GROUP_ID"))
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
 ADMIN2_ID = int(os.getenv("ADMIN2_ID"))
 
-test_engine = (f"postgresql+psycopg://{POSTGRES_USERNAME}:{POSTGRES_TEST_PASSWORD}@{POSTGRES_TEST_HOST}:"
-               f"5432/{POSTGRES_PRACTICE_DATABASE}")
+# local dev engine use your local database
+initialize_engine = (f"postgresql+psycopg://{POSTGRES_USERNAME}:{POSTGRES_TEST_PASSWORD}@"
+                     f"{POSTGRES_TEST_HOST}:5432/{POSTGRES_PRACTICE_DATABASE}")
 
-host_engine = f"postgresql+psycopg://{POSTGRES_USERNAME}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:5432/{POSTGRES_DATABASE}"
+# host engine
+# initialize_engine = (f"postgresql+psycopg://{POSTGRES_USERNAME}:{POSTGRES_PASSWORD}"
+#                      f"@{POSTGRES_HOST}:5432/{POSTGRES_DATABASE}")
