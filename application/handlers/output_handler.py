@@ -1,3 +1,4 @@
+import html
 import traceback
 
 from aiogram import Bot
@@ -140,11 +141,24 @@ async def ignore_message(callback: CallbackQuery):
     await database.PendingUser.delete_pending(int(user_id))
 
 
-async def send_alarm(admin_id: int, error):
+async def send_alarm(admin_id: int, error: Exception):
     traceback_str = ''.join(traceback.format_tb(error.__traceback__))
+    traceback_str = html.escape(traceback_str)
+
     alarm_message = (f"<b>ALARM!!! ALARM!!! THE PROBLEM DETECTED!!!:</b>\n"
                      f"{traceback_str}")
-    try:
-        await bot.send_message(admin_id, alarm_message, parse_mode='html')
-    except Exception as e:
-        print(f"Failed to send message to {admin_id}: {e}")
+
+    max_message_length = 4096
+    while len(alarm_message) > max_message_length:
+        part = alarm_message[:max_message_length]
+        alarm_message = alarm_message[max_message_length:]
+        try:
+            await bot.send_message(admin_id, part, parse_mode='HTML')
+        except Exception as e:
+            print(f"Can't send a part of the message {admin_id}: {e}")
+
+    if alarm_message:
+        try:
+            await bot.send_message(admin_id, alarm_message, parse_mode='HTML')
+        except Exception as e:
+            print(f"Can't send the last part of the message {admin_id}: {e}")

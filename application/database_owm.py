@@ -1,9 +1,12 @@
+import asyncio
+
 from aiogram.fsm.context import FSMContext
-from aiogram.types import (Message)
+from aiogram.types import Message
 from passlib.hash import bcrypt
-from sqlalchemy import (create_engine, Column, Integer, BigInteger,
-                        Sequence, Double, Text, ForeignKey,
-                        String, func, Date, text, Time, DateTime)
+from psycopg import errors
+from sqlalchemy import (create_engine, Column, Integer, BigInteger, Sequence, Double, Text, ForeignKey, String, func,
+                        Date, Time, DateTime, text)
+from sqlalchemy import exc
 from sqlalchemy.orm import sessionmaker, declarative_base, exc
 
 import application.dropbox_factory as dropbox
@@ -14,18 +17,37 @@ engine = create_engine(INITIALIZE_ENGINE)
 
 Session = sessionmaker(bind=engine)
 Base = declarative_base()
-session = Session()
 
 
-async def do_commit(admin_id: int = ADMIN_ID):
-    try:
-        session.commit()
-    except Exception as error:
-        session.rollback()
-        await send_alarm(admin_id, error)
-        raise
-    finally:
-        session.close()
+class DatabaseSessionManager:
+    def __init__(self):
+        self.session = Session()
+
+    def __enter__(self):
+        return self.session
+
+    def __exit__(self, exc_type, exc_value, traceback_obj):
+        if self.session.dirty or self.session.new or self.session.deleted:
+            if exc_type is None:
+                try:
+                    self.session.commit()
+                except (errors.ForeignKeyViolation, exc.IntegrityError):
+                    self.session.rollback()
+                    raise
+                except Exception as error:
+                    self.session.rollback()
+                    if asyncio.get_event_loop().is_running():
+                        asyncio.create_task(self.handle_error(error))
+                    else:
+                        asyncio.run(self.handle_error(error))
+                    raise
+            else:
+                self.session.rollback()
+        self.session.close()
+
+    @staticmethod
+    async def handle_error(error):
+        await send_alarm(ADMIN_ID, error)
 
 
 class AccessToken(Base):
@@ -35,17 +57,18 @@ class AccessToken(Base):
 
     @staticmethod
     def get_token():
-        return session.query(AccessToken).first()
+        with DatabaseSessionManager() as session:
+            return session.query(AccessToken).first()
 
     @staticmethod
     async def update_token(value: str):
-        try:
-            access_token = AccessToken.get_token()
-            session.delete(access_token)
-        except exc.UnmappedInstanceError:
-            print("Token is empty. adding new one")
-        session.add(AccessToken(id=1, value=value))
-        await do_commit()
+        with DatabaseSessionManager() as session:
+            try:
+                access_token = AccessToken.get_token()
+                session.delete(access_token)
+            except exc.UnmappedInstanceError:
+                print("Token is empty. adding new one")
+            session.add(AccessToken(id=1, value=value))
 
 
 class Basket(Base):
@@ -55,18 +78,20 @@ class Basket(Base):
 
     @staticmethod
     def get_by_user_id(user_id: int):
-        return session.query(Basket).filter_by(user_id=user_id).first()
+        with DatabaseSessionManager() as session:
+            return session.query(Basket).filter_by(user_id=user_id).first()
 
     @staticmethod
     def get_max_id():
-        return session.query(func.max(Basket.id)).first()[0]
+        with DatabaseSessionManager() as session:
+            return session.query(func.max(Basket.id)).first()[0]
 
     @staticmethod
     async def add_new(user_id: int):
-        basket_id = Basket.get_max_id() + 1
-        session.add(Basket(id=basket_id, user_id=user_id))
-        await change_sequence(Basket.__tablename__, basket_id)
-        await do_commit()
+        with DatabaseSessionManager() as session:
+            basket_id = Basket.get_max_id() + 1
+            session.add(Basket(id=basket_id, user_id=user_id))
+            await change_sequence(Basket.__tablename__, basket_id)
 
 
 class BasketObject(Base):
@@ -83,41 +108,42 @@ class BasketObject(Base):
 
     @staticmethod
     def get_by_product_and_user_id(product_id, user_id):
-        return session.query(BasketObject).where(BasketObject.product_id == product_id,
-                                                 BasketObject.user_id == user_id).first()
+        with DatabaseSessionManager() as session:
+            return session.query(BasketObject).where(BasketObject.product_id == product_id,
+                                                     BasketObject.user_id == user_id).first()
 
     @staticmethod
     def get_max_id():
-        result = session.query(func.max(BasketObject.id)).first()[0]
-        return result if result is not None else 0
+        with DatabaseSessionManager() as session:
+            result = session.query(func.max(BasketObject.id)).first()[0]
+            return result if result is not None else 0
 
     @staticmethod
     async def add_new(product_id: int, telegram_id: int):
-        user_id = Consumer.get_by_telegram_id(telegram_id).id
-        basket_object = BasketObject.get_by_product_and_user_id(product_id, user_id)
+        with DatabaseSessionManager() as session:
+            user_id = Consumer.get_by_telegram_id(telegram_id).id
+            basket_object = BasketObject.get_by_product_and_user_id(product_id, user_id)
 
-        if basket_object is not None:
-            basket_object.amount += 1
-            await do_commit()
-            return f"Changed amount {basket_object.amount}"
-        else:
-            basket_object_id = BasketObject.get_max_id() + 1
-            product = Product.get_by_id(product_id)
-            values = {'id': basket_object_id,
-                      'title': product.title,
-                      'image_link': product.image_link,
-                      'user_id': user_id,
-                      'product_id': product_id,
-                      'company_id': product.company_id,
-                      'basket_id': Basket.get_by_user_id(user_id).id,
-                      'price': product.price,
-                      'amount': 1}
+            if basket_object is not None:
+                basket_object.amount += 1
+                return f"Changed amount {basket_object.amount}"
+            else:
+                basket_object_id = BasketObject.get_max_id() + 1
+                product = Product.get_by_id(product_id)
+                values = {'id': basket_object_id,
+                          'title': product.title,
+                          'image_link': product.image_link,
+                          'user_id': user_id,
+                          'product_id': product_id,
+                          'company_id': product.company_id,
+                          'basket_id': Basket.get_by_user_id(user_id).id,
+                          'price': product.price,
+                          'amount': 1}
 
-            new_object = BasketObject(**values)
-            session.add(new_object)
-            await change_sequence(BasketObject.__tablename__, basket_object_id)
-            await do_commit()
-            return "Added to basket"
+                new_object = BasketObject(**values)
+                session.add(new_object)
+                await change_sequence(BasketObject.__tablename__, basket_object_id)
+                return "Added to basket"
 
 
 class Wish(Base):
@@ -127,18 +153,20 @@ class Wish(Base):
 
     @staticmethod
     def get_by_user_id(user_id: int):
-        return session.query(Wish).filter_by(user_id=user_id).first()
+        with DatabaseSessionManager() as session:
+            return session.query(Wish).filter_by(user_id=user_id).first()
 
     @staticmethod
     def get_max_id():
-        return session.query(func.max(Wish.id)).first()[0]
+        with DatabaseSessionManager() as session:
+            return session.query(func.max(Wish.id)).first()[0]
 
     @staticmethod
     async def add_new(user_id: int):
-        wish_id = Wish.get_max_id() + 1
-        session.add(Wish(id=wish_id, user_id=user_id))
-        await change_sequence(Wish.__tablename__, wish_id)
-        await do_commit()
+        with DatabaseSessionManager() as session:
+            wish_id = Wish.get_max_id() + 1
+            session.add(Wish(id=wish_id, user_id=user_id))
+            await change_sequence(Wish.__tablename__, wish_id)
 
 
 class WishObject(Base):
@@ -154,39 +182,40 @@ class WishObject(Base):
 
     @staticmethod
     def get_max_id():
-        return session.query(func.max(WishObject.id)).first()[0]
+        with DatabaseSessionManager() as session:
+            return session.query(func.max(WishObject.id)).first()[0]
 
     @staticmethod
     def get_by_product_and_user_id(product_id, user_id):
-        return session.query(WishObject).where(WishObject.product_id == product_id,
-                                               WishObject.user_id == user_id).first()
+        with DatabaseSessionManager() as session:
+            return session.query(WishObject).where(WishObject.product_id == product_id,
+                                                   WishObject.user_id == user_id).first()
 
     @staticmethod
     async def add_new(product_id: int, telegram_id: int):
-        user_id = Consumer.get_by_telegram_id(telegram_id).id
-        wish_object = WishObject.get_by_product_and_user_id(product_id, user_id)
+        with DatabaseSessionManager() as session:
+            user_id = Consumer.get_by_telegram_id(telegram_id).id
+            wish_object = WishObject.get_by_product_and_user_id(product_id, user_id)
 
-        if wish_object is not None:
-            session.delete(wish_object)
-            await do_commit()
-            return f"Deleted from wishes"
-        else:
-            wish_object_id = WishObject.get_max_id() + 1
-            product = Product.get_by_id(product_id)
-            values = {'id': wish_object_id,
-                      'title': product.title,
-                      'image_link': product.image_link,
-                      'user_id': user_id,
-                      'product_id': product_id,
-                      'company_id': product.company_id,
-                      'wish_id': Wish.get_by_user_id(user_id).id,
-                      'price': product.price}
+            if wish_object is not None:
+                session.delete(wish_object)
+                return f"Deleted from wishes"
+            else:
+                wish_object_id = WishObject.get_max_id() + 1
+                product = Product.get_by_id(product_id)
+                values = {'id': wish_object_id,
+                          'title': product.title,
+                          'image_link': product.image_link,
+                          'user_id': user_id,
+                          'product_id': product_id,
+                          'company_id': product.company_id,
+                          'wish_id': Wish.get_by_user_id(user_id).id,
+                          'price': product.price}
 
-            new_object = WishObject(**values)
-            session.add(new_object)
-            await change_sequence(WishObject.__tablename__, wish_object_id)
-            await do_commit()
-            return "Added to wishes"
+                new_object = WishObject(**values)
+                session.add(new_object)
+                await change_sequence(WishObject.__tablename__, wish_object_id)
+                return "Added to wishes"
 
 
 class Order(Base):
@@ -202,11 +231,13 @@ class Order(Base):
 
     @staticmethod
     def get_by_id(kitchen_id: int):
-        return session.query(Kitchen).filter_by(id=kitchen_id).first()
+        with DatabaseSessionManager() as session:
+            return session.query(Kitchen).filter_by(id=kitchen_id).first()
 
     @staticmethod
     def get_all_by_user_id(user_id: int):
-        return session.query(Order).filter_by(user_id=user_id).all()
+        with DatabaseSessionManager() as session:
+            return session.query(Order).filter_by(user_id=user_id).all()
 
 
 class OrderObject(Base):
@@ -228,11 +259,13 @@ class Country(Base):
 
     @staticmethod
     def get_by_id(country_id: int):
-        return session.query(Country).filter_by(id=country_id).first()
+        with DatabaseSessionManager() as session:
+            return session.query(Country).filter_by(id=country_id).first()
 
     @staticmethod
     def get_all():
-        return session.query(Country).all()
+        with DatabaseSessionManager() as session:
+            return session.query(Country).all()
 
 
 class Kitchen(Base):
@@ -242,11 +275,13 @@ class Kitchen(Base):
 
     @staticmethod
     def get_by_id(kitchen_id: int):
-        return session.query(Kitchen).filter_by(id=kitchen_id).first()
+        with DatabaseSessionManager() as session:
+            return session.query(Kitchen).filter_by(id=kitchen_id).first()
 
     @staticmethod
     def get_all():
-        return session.query(Kitchen).all()
+        with DatabaseSessionManager() as session:
+            return session.query(Kitchen).all()
 
 
 class Company(Base):
@@ -261,49 +296,56 @@ class Company(Base):
 
     @staticmethod
     def get_company_by_id(company_id: int):
-        return session.query(Company).filter_by(id=company_id).first()
+        with DatabaseSessionManager() as session:
+            return session.query(Company).filter_by(id=company_id).first()
 
     @staticmethod
     def get_for_catalog(page: int = 1, skip_size: int = 1):
-        skips_page = (page - 1) * skip_size
-        company_count = session.query(Company).count()
-        return session.query(Company).order_by(Company.title).offset(skips_page).limit(skip_size).first(), company_count
+        with DatabaseSessionManager() as session:
+            skips_page = (page - 1) * skip_size
+            company_count = session.query(Company).count()
+            return session.query(Company).order_by(Company.title).offset(skips_page).limit(
+                skip_size).first(), company_count
 
     @staticmethod
     def get_max_id():
-        return session.query(func.max(Company.id)).first()[0]
+        with DatabaseSessionManager() as session:
+            return session.query(func.max(Company.id)).first()[0]
 
     @staticmethod
     async def add_new(values: dict):
-        company_id = Company.get_max_id() + 1
-        values.update({'rating': None, 'id': company_id})
-        session.add(Company(**values))
-        await change_sequence(Company.__tablename__, company_id)
-        await do_commit()
+        with DatabaseSessionManager() as session:
+            company_id = Company.get_max_id() + 1
+            values.update({'rating': None, 'id': company_id})
+            session.add(Company(**values))
+            await change_sequence(Company.__tablename__, company_id)
 
     @staticmethod
     async def delete(message: Message, state: FSMContext, company_id: int):
-        company = session.query(Company).filter_by(id=company_id).first()
-        image_link = company.image_link
+        with DatabaseSessionManager() as session:
+            company = session.query(Company).filter_by(id=company_id).first()
+            image_link = company.image_link
 
-        if "dropbox" in image_link:
-            values = {'type': 'company', 'id': str(company_id)}
-            await dropbox.delete_file(message, state, values)
-        else:
-            await Company.delete_directly(company_id, message, state)
+            if "dropbox" in image_link:
+                values = {'type': 'company', 'id': str(company_id)}
+                await dropbox.delete_file(message, state, values)
+            else:
+                await Company.delete_directly(company_id, message, state)
 
     @staticmethod
     async def delete_directly(company_id: int, message: Message, state: FSMContext):
-        products = Product.get_all_by_company_id(company_id)
-        for product in products:
-            await Product.delete(message=message, product_id=product.id, state=state)
+        with DatabaseSessionManager() as session:
+            try:
+                products = Product.get_all_by_company_id(company_id)
+                for product in products:
+                    await Product.delete(message=message, product_id=product.id, state=state)
 
-        company = session.query(Company).filter_by(id=company_id).first()
-        title = company.title
-        session.delete(company)
-        await do_commit()
-        await message.answer(f'Company: {title} deleted successfully')
-        return True
+                company = session.query(Company).filter_by(id=company_id).first()
+                title = company.title
+                session.delete(company)
+                return True
+            except (errors.ForeignKeyViolation, exc.IntegrityError):
+                await message.answer('Foreign Key violation')
 
 
 class Product(Base):
@@ -319,49 +361,56 @@ class Product(Base):
 
     @staticmethod
     def get_by_id(product_id: int):
-        return session.query(Product).filter_by(id=product_id).first()
+        with DatabaseSessionManager() as session:
+            return session.query(Product).filter_by(id=product_id).first()
 
     @staticmethod
     def get_for_catalog(company_id, page: int = 1, skip_size: int = 1):
-        skips_page = (page - 1) * skip_size
-        product_count = session.query(Product).where(Product.company_id == company_id).count()
-        return session.query(Product).where(Product.company_id == company_id).order_by(Product.title).offset(
-            skips_page).limit(skip_size).first(), product_count
+        with DatabaseSessionManager() as session:
+            skips_page = (page - 1) * skip_size
+            product_count = session.query(Product).where(Product.company_id == company_id).count()
+            return session.query(Product).where(Product.company_id == company_id).order_by(Product.title).offset(
+                skips_page).limit(skip_size).first(), product_count
 
     @staticmethod
     def get_all_by_company_id(company_id: int):
-        return session.query(Product).filter_by(company_id=company_id).all()
+        with DatabaseSessionManager() as session:
+            return session.query(Product).filter_by(company_id=company_id).all()
 
     @staticmethod
     async def delete(message: Message, state: FSMContext, product_id):
-        product = session.query(Product).filter_by(id=product_id).first()
-        image_link = product.image_link
-        if "dropbox" in image_link:
-            values = {'type': 'product', 'id': str(product_id)}
-            await dropbox.delete_file(message, state, values)
-        else:
-            await Product.delete_directly(product.id, message)
+        with DatabaseSessionManager() as session:
+            product = session.query(Product).filter_by(id=product_id).first()
+            image_link = product.image_link
+            if "dropbox" in image_link:
+                values = {'type': 'product', 'id': str(product_id)}
+                await dropbox.delete_file(message, state, values)
+            else:
+                await Product.delete_directly(product.id, message)
 
     @staticmethod
     async def delete_directly(product_id: int, message: Message):
-        product = session.query(Product).filter_by(id=product_id).first()
-        title = product.title
-        session.delete(product)
-        await do_commit()
-        await message.answer(f'Product: "{title}" deleted successfully')
-        return True
+        with DatabaseSessionManager() as session:
+            try:
+                product = session.query(Product).filter_by(id=product_id).first()
+                title = product.title
+                session.delete(product)
+                return True
+            except (errors.ForeignKeyViolation, exc.IntegrityError):
+                await message.answer('Foreign Key violation')
 
     @staticmethod
     def get_max_id():
-        return session.query(func.max(Product.id)).first()[0]
+        with DatabaseSessionManager() as session:
+            return session.query(func.max(Product.id)).first()[0]
 
     @staticmethod
     async def add_new(values):
-        product_id = Product.get_max_id() + 1
-        values.update({'id': product_id})
-        session.add(Product(**values))
-        await change_sequence(Product.__tablename__, product_id)
-        await do_commit()
+        with DatabaseSessionManager() as session:
+            product_id = Product.get_max_id() + 1
+            values.update({'id': product_id})
+            session.add(Product(**values))
+            await change_sequence(Product.__tablename__, product_id)
 
 
 class Rating(Base):
@@ -405,32 +454,37 @@ class Consumer(Base):
 
     @staticmethod
     def get_user_by_id(user_id: int):
-        result = session.query(Consumer).filter_by(id=user_id).first()
-        return result if result is not None else Consumer(username="Unauthorized")
+        with DatabaseSessionManager() as session:
+            result = session.query(Consumer).filter_by(id=user_id).first()
+            return result if result is not None else Consumer(username="Unauthorized")
 
     @staticmethod
     def get_by_telegram_id(telegram_id: int):
-        result = session.query(Consumer).filter_by(telegram_id=telegram_id).first()
-        return result if result is not None else Consumer(username="Unauthorized")
+        with DatabaseSessionManager() as session:
+            result = session.query(Consumer).filter_by(telegram_id=telegram_id).first()
+            return result if result is not None else Consumer(username="Unauthorized")
 
     @staticmethod
     def get_by_username(username: str):
-        result = session.query(Consumer).filter_by(username=username).first()
-        return result if result is not None else Consumer(username="Unauthorized")
+        with DatabaseSessionManager() as session:
+            result = session.query(Consumer).filter_by(username=username).first()
+            return result if result is not None else Consumer(username="Unauthorized")
 
     @staticmethod
     def is_authenticated(telegram_id: int):
-        result = session.query(Consumer).filter_by(telegram_id=telegram_id).first()
-        return True if result is not None else False
+        with DatabaseSessionManager() as session:
+            result = session.query(Consumer).filter_by(telegram_id=telegram_id).first()
+            return True if result is not None else False
 
     @staticmethod
     def is_admin(telegram_id: int):
-        if Consumer.is_authenticated(telegram_id):
-            result = session.query(Consumer).filter_by(telegram_id=telegram_id).first()
-            role = session.query(UserRole).filter_by(user_id=result.id).first()
-            return True if role.roles == "ADMIN" else False
-        else:
-            return False
+        with DatabaseSessionManager() as session:
+            if Consumer.is_authenticated(telegram_id):
+                result = session.query(Consumer).filter_by(telegram_id=telegram_id).first()
+                role = session.query(UserRole).filter_by(user_id=result.id).first()
+                return True if role.roles == "ADMIN" else False
+            else:
+                return False
 
     @staticmethod
     def verify_password(username: str, password: str):
@@ -442,40 +496,44 @@ class Consumer(Base):
 
     @staticmethod
     async def change_telegram_id(username: str, telegram_id: int):
-        consumer = session.query(Consumer).filter_by(username=username).first()
-        consumer.telegram_id = telegram_id
-        await do_commit()
+        with DatabaseSessionManager() as session:
+            consumer = session.query(Consumer).filter_by(username=username).first()
+            consumer.telegram_id = telegram_id
 
     @staticmethod
     def is_username_already_exists(username: str):
-        result = session.query(Consumer).filter_by(username=username).first()
-        return True if result is not None else False
+        with DatabaseSessionManager() as session:
+            result = session.query(Consumer).filter_by(username=username).first()
+            return True if result is not None else False
 
     @staticmethod
     def is_email_already_exists(email: str):
-        result = session.query(Consumer).filter_by(email=email).first()
-        return True if result is not None else False
+        with DatabaseSessionManager() as session:
+            result = session.query(Consumer).filter_by(email=email).first()
+            return True if result is not None else False
 
     @staticmethod
     def get_max_id():
-        return session.query(func.max(Consumer.id)).first()[0]
+        with DatabaseSessionManager() as session:
+            return session.query(func.max(Consumer.id)).first()[0]
 
     @staticmethod
     async def add_new(values: dict):
-        user_id = Consumer.get_max_id() + 1
-        values.update(
-            {'password': bcrypt.hash(values.get('password')), 'bonuses': 0, 'redactor': 'telegram registration',
-             'id': user_id})
-        consumer = Consumer(username=values.get('username'), email=values.get('email'), password=values.get('password'),
-                            telegram_id=values.get('telegram_id'), bonuses=0, redactor='telegram registration',
-                            id=values.get('id'))
-        session.add(consumer)
-        await change_sequence(Consumer.__tablename__, user_id)
-        await do_commit()
+        with DatabaseSessionManager() as session:
+            user_id = Consumer.get_max_id() + 1
+            values.update(
+                {'password': bcrypt.hash(values.get('password')), 'bonuses': 0, 'redactor': 'telegram registration',
+                 'id': user_id})
+            consumer = Consumer(username=values.get('username'), email=values.get('email'),
+                                password=values.get('password'),
+                                telegram_id=values.get('telegram_id'), bonuses=0, redactor='telegram registration',
+                                id=values.get('id'))
+            session.add(consumer)
+            await change_sequence(Consumer.__tablename__, user_id)
 
-        await Basket.add_new(user_id)
-        await Wish.add_new(user_id)
-        await UserRole.add_new(user_id)
+            await Basket.add_new(user_id)
+            await Wish.add_new(user_id)
+            await UserRole.add_new(user_id)
 
 
 class PendingUser(Base):
@@ -485,26 +543,28 @@ class PendingUser(Base):
 
     @staticmethod
     def get_max_id():
-        result = session.query(func.max(PendingUser.id)).first()[0]
-        return result if result is not None else 0
+        with DatabaseSessionManager() as session:
+            result = session.query(func.max(PendingUser.id)).first()[0]
+            return result if result is not None else 0
 
     @staticmethod
     def is_pending(telegram_id: int):
-        result = session.query(PendingUser).filter_by(telegram_id=telegram_id).first()
-        return True if result is not None else False
+        with DatabaseSessionManager() as session:
+            result = session.query(PendingUser).filter_by(telegram_id=telegram_id).first()
+            return True if result is not None else False
 
     @staticmethod
     async def add_new_pending(telegram_id: int):
-        pending_id = PendingUser.get_max_id() + 1
-        pending = PendingUser(id=pending_id, telegram_id=telegram_id)
-        session.add(pending)
-        await do_commit()
+        with DatabaseSessionManager() as session:
+            pending_id = PendingUser.get_max_id() + 1
+            pending = PendingUser(id=pending_id, telegram_id=telegram_id)
+            session.add(pending)
 
     @staticmethod
     async def delete_pending(telegram_id: int):
-        pending = session.query(PendingUser).filter_by(telegram_id=telegram_id).first()
-        session.delete(pending)
-        await do_commit()
+        with DatabaseSessionManager() as session:
+            pending = session.query(PendingUser).filter_by(telegram_id=telegram_id).first()
+            session.delete(pending)
 
 
 class UserRole(Base):
@@ -514,19 +574,19 @@ class UserRole(Base):
 
     @staticmethod
     def get_by_user_id(user_id: int):
-        return session.query(UserRole).filter_by(user_id=user_id).first()
+        with DatabaseSessionManager() as session:
+            return session.query(UserRole).filter_by(user_id=user_id).first()
 
     @staticmethod
     async def add_new(user_id: int):
-        new = UserRole(user_id=user_id, roles="USER")
-        session.add(new)
-        await do_commit()
+        with DatabaseSessionManager() as session:
+            new = UserRole(user_id=user_id, roles="USER")
+            session.add(new)
 
 
 async def change_sequence(table: str, value: int):
     sql = text(f"SELECT setval('public.{table.lower()}_seq', {value}, true);")
     engine.connect().execute(sql)
-    await do_commit()
 
 
 # initialize all tables
