@@ -1,3 +1,4 @@
+import html
 import traceback
 
 from aiogram import Bot
@@ -110,9 +111,9 @@ async def add_item_with_dropbox_link(message: Message, values: dict):
     values.pop('type')
     values.pop('image_way')
     if item_type == "company":
-        database.Company.add_new(values)
+        await database.Company.add_new(values)
     else:
-        database.Product.add_new(values)
+        await database.Product.add_new(values)
     await message.answer('Item added')
     await main_menu(message, message.from_user.id)
 
@@ -137,14 +138,27 @@ async def ignore_message(callback: CallbackQuery):
     message_id = callback.message.message_id
     await bot.send_message(chat_id, "Unfortunately, your question was denied", reply_to_message_id=question_message_id)
     await bot.delete_message(GROUP_ID, message_id)
-    database.PendingUser.delete_pending(int(user_id))
+    await database.PendingUser.delete_pending(int(user_id))
 
 
-async def send_alarm(admin_id: int, error):
+async def send_alarm(admin_id: int, error: Exception):
     traceback_str = ''.join(traceback.format_tb(error.__traceback__))
+    traceback_str = html.escape(traceback_str)
+
     alarm_message = (f"<b>ALARM!!! ALARM!!! THE PROBLEM DETECTED!!!:</b>\n"
                      f"{traceback_str}")
-    try:
-        await bot.send_message(admin_id, alarm_message, parse_mode='html')
-    except Exception as e:
-        print(f"Failed to send message to {admin_id}: {e}")
+
+    max_message_length = 4096
+    while len(alarm_message) > max_message_length:
+        part = alarm_message[:max_message_length]
+        alarm_message = alarm_message[max_message_length:]
+        try:
+            await bot.send_message(admin_id, part, parse_mode='HTML')
+        except Exception as e:
+            print(f"Can't send a part of the message {admin_id}: {e}")
+
+    if alarm_message:
+        try:
+            await bot.send_message(admin_id, alarm_message, parse_mode='HTML')
+        except Exception as e:
+            print(f"Can't send the last part of the message {admin_id}: {e}")
