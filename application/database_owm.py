@@ -6,8 +6,9 @@ from passlib.hash import bcrypt
 from psycopg import errors
 from sqlalchemy import (create_engine, Column, Integer, BigInteger, Sequence, Double, Text, ForeignKey, String, func,
                         Date, Time, DateTime, text)
-from sqlalchemy import exc
-from sqlalchemy.orm import sessionmaker, declarative_base, exc
+from sqlalchemy import exc as sqlalchemy_exc
+from sqlalchemy.orm import exc as sqlalchemy_orm_exc
+from sqlalchemy.orm import sessionmaker, declarative_base
 
 import application.dropbox_factory as dropbox
 from application.config import INITIALIZE_ENGINE, ADMIN_ID
@@ -31,7 +32,7 @@ class DatabaseSessionManager:
             if exc_type is None:
                 try:
                     self.session.commit()
-                except (errors.ForeignKeyViolation, exc.IntegrityError):
+                except (errors.ForeignKeyViolation, sqlalchemy_exc.IntegrityError):
                     self.session.rollback()
                     raise
                 except Exception as error:
@@ -66,7 +67,7 @@ class AccessToken(Base):
             try:
                 access_token = AccessToken.get_token()
                 session.delete(access_token)
-            except exc.UnmappedInstanceError:
+            except sqlalchemy_orm_exc.UnmappedInstanceError:
                 print("Token is empty. adding new one")
             session.add(AccessToken(id=1, value=value))
 
@@ -344,7 +345,7 @@ class Company(Base):
                 title = company.title
                 session.delete(company)
                 return True
-            except (errors.ForeignKeyViolation, exc.IntegrityError):
+            except (errors.ForeignKeyViolation, sqlalchemy_exc.IntegrityError):
                 await message.answer('Foreign Key violation')
 
 
@@ -396,7 +397,7 @@ class Product(Base):
                 title = product.title
                 session.delete(product)
                 return True
-            except (errors.ForeignKeyViolation, exc.IntegrityError):
+            except (errors.ForeignKeyViolation, sqlalchemy_exc.IntegrityError):
                 await message.answer('Foreign Key violation')
 
     @staticmethod
