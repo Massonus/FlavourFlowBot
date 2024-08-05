@@ -5,12 +5,9 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from application.handlers.output_handler import confirm_delete_company
-from application.handlers.output_handler import confirm_delete_product
-from application.handlers.output_handler import delete_company
-from application.handlers.output_handler import delete_product
-from application.handlers.output_handler import print_orders_info
-from application.handlers.output_handler import print_profile_info
+from application.handlers.output_handler import (confirm_delete_company, confirm_delete_product, delete_company,
+                                                 delete_product, print_orders_info, print_profile_info, image_question,
+                                                 choose_kitchen_category)
 
 
 @pytest.mark.asyncio
@@ -164,3 +161,56 @@ async def test_delete_product(mock_delete_company):
 
     message.delete.assert_called_once()
     mock_delete_company.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_image_question():
+    message = MagicMock(Message)
+    message.answer = AsyncMock()
+    product_category = 'category_test'
+    company_id = 123
+
+    await image_question(message, product_category, company_id)
+
+    builder = InlineKeyboardBuilder()
+    builder.button(text='DROPBOX', callback_data=f'{product_category}-{company_id}-dropbox')
+    builder.button(text='LINK', callback_data=f'{product_category}-{company_id}-link')
+    expected_markup = builder.as_markup()
+
+    message.answer.assert_called_once_with(
+        'You will upload image from your PC or use link',
+        reply_markup=expected_markup
+    )
+
+
+@pytest.mark.asyncio
+@patch('application.database_owm.Kitchen.get_all', new_callable=MagicMock)
+async def test_choose_kitchen_category(mock_kitchen_get_all):
+    message = MagicMock(Message)
+    message.answer = AsyncMock()
+    message.delete = AsyncMock()
+    image_way = 'LINK'
+
+    mock_category1 = MagicMock()
+    mock_category1.title = 'Category 1'
+    mock_category1.id = 1
+
+    mock_category2 = MagicMock()
+    mock_category2.title = 'Category 2'
+    mock_category2.id = 2
+
+    mock_kitchen_get_all.return_value = [mock_category1, mock_category2]
+
+    await choose_kitchen_category(message, image_way)
+
+    message.delete.assert_called_once()
+
+    expected_markup = InlineKeyboardBuilder()
+    expected_markup.button(text=mock_category1.title, callback_data=f'{mock_category1.id}-{image_way}-category')
+    expected_markup.button(text=mock_category2.title, callback_data=f'{mock_category2.id}-{image_way}-category')
+    expected_markup = expected_markup.as_markup()
+
+    message.answer.assert_called_once_with(
+        'Choose company category:',
+        reply_markup=expected_markup
+    )
