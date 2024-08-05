@@ -21,8 +21,9 @@ Base = declarative_base()
 
 
 class DatabaseSessionManager:
-    def __init__(self):
+    def __init__(self, message: Message = None):
         self.session = Session()
+        self.message = message
 
     def __enter__(self):
         return self.session
@@ -32,8 +33,18 @@ class DatabaseSessionManager:
             if exc_type is None:
                 try:
                     self.session.commit()
+                    if self.message is not None:
+                        if asyncio.get_event_loop().is_running():
+                            asyncio.create_task(self.print_message('success'))
+                        else:
+                            asyncio.run(self.print_message('success'))
+
                 except (errors.ForeignKeyViolation, sqlalchemy_exc.IntegrityError):
                     self.session.rollback()
+                    if asyncio.get_event_loop().is_running():
+                        asyncio.create_task(self.print_message('fail'))
+                    else:
+                        asyncio.run(self.print_message('fail'))
                     raise
                 except Exception as error:
                     self.session.rollback()
@@ -49,6 +60,14 @@ class DatabaseSessionManager:
     @staticmethod
     async def handle_error(error):
         await send_alarm(ADMIN_ID, error)
+
+    async def print_message(self, operation_result: str):
+        if operation_result == 'success':
+            await self.message.answer('Operation was successful')
+        elif operation_result == 'fail':
+            await self.message.answer('Operation failed')
+        else:
+            await self.message.answer('Fatal error')
 
 
 class AccessToken(Base):
@@ -335,14 +354,13 @@ class Company(Base):
 
     @staticmethod
     async def delete_directly(company_id: int, message: Message, state: FSMContext):
-        with DatabaseSessionManager() as session:
+        with DatabaseSessionManager(message) as session:
             try:
                 products = Product.get_all_by_company_id(company_id)
                 for product in products:
                     await Product.delete(message=message, product_id=product.id, state=state)
 
                 company = session.query(Company).filter_by(id=company_id).first()
-                title = company.title
                 session.delete(company)
                 return True
             except (errors.ForeignKeyViolation, sqlalchemy_exc.IntegrityError):
@@ -391,11 +409,12 @@ class Product(Base):
 
     @staticmethod
     async def delete_directly(product_id: int, message: Message):
-        with DatabaseSessionManager() as session:
+        with DatabaseSessionManager(message) as session:
             try:
                 product = session.query(Product).filter_by(id=product_id).first()
                 title = product.title
                 session.delete(product)
+                await message.answer(f"Trying to delete product: {title}")
                 return True
             except (errors.ForeignKeyViolation, sqlalchemy_exc.IntegrityError):
                 await message.answer('Foreign Key violation')
