@@ -6,14 +6,26 @@ from sqlalchemy import (create_engine, Column, Integer, BigInteger,
                         String, func, Date, text, Time, DateTime)
 from sqlalchemy.orm import sessionmaker, declarative_base, exc
 
-from application.config import INITIALIZE_ENGINE
 import application.dropbox_factory as dropbox
+from application.config import INITIALIZE_ENGINE, ADMIN_ID
+from application.handlers.output_handler import send_alarm
 
 engine = create_engine(INITIALIZE_ENGINE)
 
 Session = sessionmaker(bind=engine)
 Base = declarative_base()
 session = Session()
+
+
+async def do_commit(admin_id: int = ADMIN_ID):
+    try:
+        session.commit()
+    except Exception as error:
+        session.rollback()
+        await send_alarm(admin_id, error)
+        raise
+    finally:
+        session.close()
 
 
 class AccessToken(Base):
@@ -26,14 +38,14 @@ class AccessToken(Base):
         return session.query(AccessToken).first()
 
     @staticmethod
-    def update_token(value: str):
+    async def update_token(value: str):
         try:
             access_token = AccessToken.get_token()
             session.delete(access_token)
         except exc.UnmappedInstanceError:
             print("Token is empty. adding new one")
         session.add(AccessToken(id=1, value=value))
-        session.commit()
+        await do_commit()
 
 
 class Basket(Base):
@@ -50,11 +62,11 @@ class Basket(Base):
         return session.query(func.max(Basket.id)).first()[0]
 
     @staticmethod
-    def add_new(user_id: int):
+    async def add_new(user_id: int):
         basket_id = Basket.get_max_id() + 1
         session.add(Basket(id=basket_id, user_id=user_id))
-        change_sequence(Basket.__tablename__, basket_id)
-        session.commit()
+        await change_sequence(Basket.__tablename__, basket_id)
+        await do_commit()
 
 
 class BasketObject(Base):
@@ -80,13 +92,13 @@ class BasketObject(Base):
         return result if result is not None else 0
 
     @staticmethod
-    def add_new(product_id: int, telegram_id: int):
+    async def add_new(product_id: int, telegram_id: int):
         user_id = Consumer.get_by_telegram_id(telegram_id).id
         basket_object = BasketObject.get_by_product_and_user_id(product_id, user_id)
 
         if basket_object is not None:
             basket_object.amount += 1
-            session.commit()
+            await do_commit()
             return f"Changed amount {basket_object.amount}"
         else:
             basket_object_id = BasketObject.get_max_id() + 1
@@ -103,8 +115,8 @@ class BasketObject(Base):
 
             new_object = BasketObject(**values)
             session.add(new_object)
-            change_sequence(BasketObject.__tablename__, basket_object_id)
-            session.commit()
+            await change_sequence(BasketObject.__tablename__, basket_object_id)
+            await do_commit()
             return "Added to basket"
 
 
@@ -122,11 +134,11 @@ class Wish(Base):
         return session.query(func.max(Wish.id)).first()[0]
 
     @staticmethod
-    def add_new(user_id: int):
+    async def add_new(user_id: int):
         wish_id = Wish.get_max_id() + 1
         session.add(Wish(id=wish_id, user_id=user_id))
-        change_sequence(Wish.__tablename__, wish_id)
-        session.commit()
+        await change_sequence(Wish.__tablename__, wish_id)
+        await do_commit()
 
 
 class WishObject(Base):
@@ -150,13 +162,13 @@ class WishObject(Base):
                                                WishObject.user_id == user_id).first()
 
     @staticmethod
-    def add_new(product_id: int, telegram_id: int):
+    async def add_new(product_id: int, telegram_id: int):
         user_id = Consumer.get_by_telegram_id(telegram_id).id
         wish_object = WishObject.get_by_product_and_user_id(product_id, user_id)
 
         if wish_object is not None:
             session.delete(wish_object)
-            session.commit()
+            await do_commit()
             return f"Deleted from wishes"
         else:
             wish_object_id = WishObject.get_max_id() + 1
@@ -172,8 +184,8 @@ class WishObject(Base):
 
             new_object = WishObject(**values)
             session.add(new_object)
-            change_sequence(WishObject.__tablename__, wish_object_id)
-            session.commit()
+            await change_sequence(WishObject.__tablename__, wish_object_id)
+            await do_commit()
             return "Added to wishes"
 
 
@@ -262,12 +274,12 @@ class Company(Base):
         return session.query(func.max(Company.id)).first()[0]
 
     @staticmethod
-    def add_new(values: dict):
+    async def add_new(values: dict):
         company_id = Company.get_max_id() + 1
         values.update({'rating': None, 'id': company_id})
         session.add(Company(**values))
-        change_sequence(Company.__tablename__, company_id)
-        session.commit()
+        await change_sequence(Company.__tablename__, company_id)
+        await do_commit()
 
     @staticmethod
     async def delete(message: Message, state: FSMContext, company_id: int):
@@ -289,7 +301,7 @@ class Company(Base):
         company = session.query(Company).filter_by(id=company_id).first()
         title = company.title
         session.delete(company)
-        session.commit()
+        await do_commit()
         await message.answer(f'Company: {title} deleted successfully')
         return True
 
@@ -335,7 +347,7 @@ class Product(Base):
         product = session.query(Product).filter_by(id=product_id).first()
         title = product.title
         session.delete(product)
-        session.commit()
+        await do_commit()
         await message.answer(f'Product: "{title}" deleted successfully')
         return True
 
@@ -344,12 +356,12 @@ class Product(Base):
         return session.query(func.max(Product.id)).first()[0]
 
     @staticmethod
-    def add_new(values):
+    async def add_new(values):
         product_id = Product.get_max_id() + 1
         values.update({'id': product_id})
         session.add(Product(**values))
-        change_sequence(Product.__tablename__, product_id)
-        session.commit()
+        await change_sequence(Product.__tablename__, product_id)
+        await do_commit()
 
 
 class Rating(Base):
@@ -429,10 +441,10 @@ class Consumer(Base):
             return False
 
     @staticmethod
-    def change_telegram_id(username: str, telegram_id: int):
+    async def change_telegram_id(username: str, telegram_id: int):
         consumer = session.query(Consumer).filter_by(username=username).first()
         consumer.telegram_id = telegram_id
-        session.commit()
+        await do_commit()
 
     @staticmethod
     def is_username_already_exists(username: str):
@@ -449,7 +461,7 @@ class Consumer(Base):
         return session.query(func.max(Consumer.id)).first()[0]
 
     @staticmethod
-    def add_new(values: dict):
+    async def add_new(values: dict):
         user_id = Consumer.get_max_id() + 1
         values.update(
             {'password': bcrypt.hash(values.get('password')), 'bonuses': 0, 'redactor': 'telegram registration',
@@ -458,12 +470,12 @@ class Consumer(Base):
                             telegram_id=values.get('telegram_id'), bonuses=0, redactor='telegram registration',
                             id=values.get('id'))
         session.add(consumer)
-        change_sequence(Consumer.__tablename__, user_id)
-        session.commit()
+        await change_sequence(Consumer.__tablename__, user_id)
+        await do_commit()
 
-        Basket.add_new(user_id)
-        Wish.add_new(user_id)
-        UserRole.add_new(user_id)
+        await Basket.add_new(user_id)
+        await Wish.add_new(user_id)
+        await UserRole.add_new(user_id)
 
 
 class PendingUser(Base):
@@ -482,17 +494,17 @@ class PendingUser(Base):
         return True if result is not None else False
 
     @staticmethod
-    def add_new_pending(telegram_id: int):
+    async def add_new_pending(telegram_id: int):
         pending_id = PendingUser.get_max_id() + 1
         pending = PendingUser(id=pending_id, telegram_id=telegram_id)
         session.add(pending)
-        session.commit()
+        await do_commit()
 
     @staticmethod
-    def delete_pending(telegram_id: int):
+    async def delete_pending(telegram_id: int):
         pending = session.query(PendingUser).filter_by(telegram_id=telegram_id).first()
         session.delete(pending)
-        session.commit()
+        await do_commit()
 
 
 class UserRole(Base):
@@ -505,16 +517,16 @@ class UserRole(Base):
         return session.query(UserRole).filter_by(user_id=user_id).first()
 
     @staticmethod
-    def add_new(user_id: int):
+    async def add_new(user_id: int):
         new = UserRole(user_id=user_id, roles="USER")
         session.add(new)
-        session.commit()
+        await do_commit()
 
 
-def change_sequence(table: str, value: int):
+async def change_sequence(table: str, value: int):
     sql = text(f"SELECT setval('public.{table.lower()}_seq', {value}, true);")
     engine.connect().execute(sql)
-    session.commit()
+    await do_commit()
 
 
 # initialize all tables

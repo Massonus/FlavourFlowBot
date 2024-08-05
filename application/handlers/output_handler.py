@@ -110,9 +110,9 @@ async def add_item_with_dropbox_link(message: Message, values: dict):
     values.pop('type')
     values.pop('image_way')
     if item_type == "company":
-        database.Company.add_new(values)
+        await database.Company.add_new(values)
     else:
-        database.Product.add_new(values)
+        await database.Product.add_new(values)
     await message.answer('Item added')
     await main_menu(message, message.from_user.id)
 
@@ -137,7 +137,7 @@ async def ignore_message(callback: CallbackQuery):
     message_id = callback.message.message_id
     await bot.send_message(chat_id, "Unfortunately, your question was denied", reply_to_message_id=question_message_id)
     await bot.delete_message(GROUP_ID, message_id)
-    database.PendingUser.delete_pending(int(user_id))
+    await database.PendingUser.delete_pending(int(user_id))
 
 
 async def send_alarm(admin_id: int, error):

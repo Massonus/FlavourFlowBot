@@ -34,11 +34,13 @@ async def process_callback(callback_query: CallbackQuery, state: FSMContext):
 
         case _ if "add-basket" in data:
             product_id = int(data.split('-')[0])
-            await message.answer(database.BasketObject.add_new(product_id, user_id))
+            message_text = await database.BasketObject.add_new(product_id, user_id)
+            await message.answer(message_text)
 
         case _ if "add-wish" in data:
             product_id = int(data.split('-')[0])
-            await message.answer(database.WishObject.add_new(product_id, user_id))
+            message_text = await database.WishObject.add_new(product_id, user_id)
+            await message.answer(message_text)
 
         case "profile":
             await output.print_profile_info(callback_query.message, callback_query.from_user.id)

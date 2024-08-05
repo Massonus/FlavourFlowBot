@@ -47,7 +47,7 @@ async def after_init_token(message: Message, state: FSMContext):
         await message.answer(f'Error: {e}')
         return
 
-    database.AccessToken.update_token(oauth_result.access_token)
+    await database.AccessToken.update_token(oauth_result.access_token)
     await message.answer("Successfully set up client!")
 
     if photo_bytes is None:

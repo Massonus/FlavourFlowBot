@@ -39,7 +39,7 @@ async def command_help(message: Message):
 
     try:
         username = database.Consumer.get_by_telegram_id(message.from_user.id).username
-        database.Consumer.change_telegram_id(username, 0)
+        await database.Consumer.change_telegram_id(username, 0)
         await message.answer("Successfully logout")
         await main_menu(message, message.from_user.id)
     except AttributeError:

@@ -141,9 +141,9 @@ async def add_item_with_link(message: Message, state: FSMContext):
     values.pop('type')
     values.pop('image_way')
     if item_type == "company":
-        database.Company.add_new(values)
+        await database.Company.add_new(values)
     else:
-        database.Product.add_new(values)
+        await database.Product.add_new(values)
     await message.answer('Item added')
     await main_menu(message, message.from_user.id)
 
@@ -153,7 +153,7 @@ async def send_question_to_support_group(message: Message, state: FSMContext):
     user_id = message.from_user.id
     await message.reply("Your question was sent")
     await main_menu(message, message.from_user.id)
-    database.PendingUser.add_new_pending(user_id)
+    await database.PendingUser.add_new_pending(user_id)
     markup = InlineKeyboardBuilder()
     markup.button(text='💬 Answer', callback_data=f"{message.chat.id}:{user_id}:{message.message_id}:answer")
     markup.button(text='❌ Ignore', callback_data=f"{message.chat.id}:{user_id}:{message.message_id}:ignore")
@@ -234,7 +234,7 @@ async def registration_result(message: types.Message, state: FSMContext):
 
     if password == confirm_password and not database.Consumer.is_username_already_exists(username):
         user_data.update({'telegram_id': message.from_user.id})
-        database.Consumer.add_new(user_data)
+        await database.Consumer.add_new(user_data)
         consumer = database.Consumer.get_by_telegram_id(message.from_user.id)
         await message.reply(
             f"Successful registration. Welcome {consumer.username}!")
@@ -256,7 +256,7 @@ async def login_result(message: types.Message, state: FSMContext):
     is_correct_password = database.Consumer.verify_password(username, password)
 
     if is_correct_username and is_correct_password:
-        database.Consumer.change_telegram_id(username, message.from_user.id)
+        await database.Consumer.change_telegram_id(username, message.from_user.id)
         await message.reply(f"Success authorization. Welcome "
                             f"{database.Consumer.get_by_telegram_id(message.from_user.id).username}!")
         await main_menu(message, message.from_user.id)
@@ -276,7 +276,7 @@ async def send_answer(message: Message, state: FSMContext):
     await bot.send_message(chat_id, f'You have received an answer:\n<b>{message.text}</b>', parse_mode='HTML',
                            reply_to_message_id=question_message_id)
     await message.reply('Your answer was sent')
-    database.PendingUser.delete_pending(user_id)
+    await database.PendingUser.delete_pending(user_id)
     await bot.delete_message(GROUP_ID, message_id)
     await state.clear()
 
