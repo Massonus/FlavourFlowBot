@@ -1,10 +1,14 @@
 from unittest.mock import patch, AsyncMock, MagicMock
 
 import pytest
+from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from application.handlers.output_handler import confirm_delete_company
 from application.handlers.output_handler import confirm_delete_product
+from application.handlers.output_handler import delete_company
+from application.handlers.output_handler import delete_product
 from application.handlers.output_handler import print_orders_info
 from application.handlers.output_handler import print_profile_info
 
@@ -105,3 +109,58 @@ async def test_confirm_delete_product():
         'Do you really want to delete this product?',
         reply_markup=expected_markup
     )
+
+
+@pytest.mark.asyncio
+async def test_confirm_delete_company():
+    message = MagicMock(Message)
+    message.delete = AsyncMock()
+    message.answer = AsyncMock()
+
+    company_id = 123
+
+    await confirm_delete_company(message, company_id)
+
+    message.delete.assert_called_once()
+
+    expected_markup = InlineKeyboardBuilder().row(
+        InlineKeyboardButton(text='✅', callback_data=f'{company_id}-conf-del-comp'),
+        InlineKeyboardButton(text='❌', callback_data='deny-delete')
+    ).as_markup()
+
+    message.answer.assert_called_once_with(
+        'Do you really want to delete this company? All products inside will be deleted too',
+        reply_markup=expected_markup
+    )
+
+
+@pytest.mark.asyncio
+@patch('application.database_owm.Product.delete', new_callable=AsyncMock)
+async def test_delete_product(mock_delete_product):
+    message = MagicMock(Message)
+    message.delete = AsyncMock()
+
+    state = MagicMock(FSMContext)
+
+    product_id = 123
+
+    await delete_product(message, state, product_id)
+
+    message.delete.assert_called_once()
+    mock_delete_product.assert_called_once()
+
+
+@pytest.mark.asyncio
+@patch('application.database_owm.Company.delete', new_callable=AsyncMock)
+async def test_delete_product(mock_delete_company):
+    message = MagicMock(Message)
+    message.delete = AsyncMock()
+
+    state = MagicMock(FSMContext)
+
+    company_id = 123
+
+    await delete_company(message, state, company_id)
+
+    message.delete.assert_called_once()
+    mock_delete_company.assert_called_once()
