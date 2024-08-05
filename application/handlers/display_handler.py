@@ -1,7 +1,7 @@
 from aiogram import Bot
-from aiogram.types import (CallbackQuery)
+
 from aiogram.types import (InlineKeyboardMarkup, InlineKeyboardButton,
-                           Message)
+                           Message, InputMediaPhoto, CallbackQuery)
 
 import application.database_owm as database
 from application.config import TG_TOKEN
@@ -22,7 +22,7 @@ async def main_menu(message: Message, user_id):
         register_btn = InlineKeyboardButton(text='🆕 Registration', callback_data='register')
         inline_keyboard.append([login_btn, register_btn])
 
-    catalog_btn = InlineKeyboardButton(text='🏪 Go to catalog', callback_data='1-companies')
+    catalog_btn = InlineKeyboardButton(text='🏪 Go to catalog', callback_data='1-companies-initial')
     support_btn = InlineKeyboardButton(text='💬 Write to us', callback_data='help')
     site_btn = InlineKeyboardButton(text='🔗 Go to our site',
                                     url='http://flavourflow.eu-central-1.elasticbeanstalk.com')
@@ -35,11 +35,10 @@ async def main_menu(message: Message, user_id):
     await message.answer("Main menu. Choose the option:", reply_markup=markup)
 
 
-async def companies_catalog(callback: CallbackQuery):
+async def companies_catalog(callback: CallbackQuery, initial=False):
     page = int(callback.data.split('-')[0])
 
-    # Number of rows and data for 1 page
-    company, count = database.Company.get_for_catalog(page, skip_size=1)  # skip_size - display by one element
+    company, count = database.Company.get_for_catalog(page, skip_size=1)
 
     buttons = [
         [InlineKeyboardButton(text='Return to main menu', callback_data='main menu')],
@@ -69,21 +68,35 @@ async def companies_catalog(callback: CallbackQuery):
 
     markup = InlineKeyboardMarkup(inline_keyboard=buttons)
 
-    await bot.delete_message(callback.message.chat.id, callback.message.message_id)
-    await bot.send_photo(callback.message.chat.id, photo=company.image_link,
-                         caption=f'<b>{company.title}</b>\n\n'
-                                 f'<b>Description:</b> '
-                                 f'<i>{company.description}</i>\n', parse_mode="HTML", reply_markup=markup)
+    if initial:
+        await bot.delete_message(callback.message.chat.id, callback.message.message_id)
+        await bot.send_photo(callback.message.chat.id, photo=company.image_link,
+                             caption=f'<b>{company.title}</b>\n\n'
+                                     f'<b>Description:</b> '
+                                     f'<i>{company.description}</i>\n', parse_mode="HTML", reply_markup=markup)
+    else:
+        await bot.edit_message_media(
+            media=InputMediaPhoto(media=company.image_link),
+            chat_id=callback.message.chat.id,
+            message_id=callback.message.message_id)
+
+        await bot.edit_message_caption(
+            chat_id=callback.message.chat.id,
+            message_id=callback.message.message_id,
+            caption=f'<b>{company.title}</b>\n\n'
+                    f'<b>Description:</b> '
+                    f'<i>{company.description}</i>\n',
+            parse_mode="HTML",
+            reply_markup=markup)
 
 
-async def products_catalog(callback: CallbackQuery):
+async def products_catalog(callback: CallbackQuery, initial=False):
     text_split = callback.data.split('-')
     page = int(text_split[0])
     company_id = int(text_split[1])
     company_page = int(text_split[2])
 
     try:
-        # Number of rows and data for 1 page
         product, count = database.Product.get_for_catalog(company_id, page, skip_size=1)
 
         buttons = [
@@ -124,13 +137,31 @@ async def products_catalog(callback: CallbackQuery):
 
         markup = InlineKeyboardMarkup(inline_keyboard=buttons)
 
-        await bot.delete_message(callback.message.chat.id, callback.message.message_id)
-        await bot.send_photo(callback.message.chat.id, photo=product.image_link,
-                             caption=f'<b>{product.title}</b>\n\n'
-                                     f'<b>Description:</b> '
-                                     f'<i>{product.description}</i>\n'
-                                     f'<b>Composition:</b> '
-                                     f'<i>{product.composition}</i>\n', parse_mode="HTML", reply_markup=markup)
+        if initial:
+            await bot.delete_message(callback.message.chat.id, callback.message.message_id)
+            await bot.send_photo(callback.message.chat.id, photo=product.image_link,
+                                 caption=f'<b>{product.title}</b>\n\n'
+                                         f'<b>Description:</b> '
+                                         f'<i>{product.description}</i>\n'
+                                         f'<b>Composition:</b> '
+                                         f'<i>{product.composition}</i>\n', parse_mode="HTML", reply_markup=markup)
+        else:
+            await bot.edit_message_media(
+                media=InputMediaPhoto(media=product.image_link),
+                chat_id=callback.message.chat.id,
+                message_id=callback.message.message_id)
+
+            await bot.edit_message_caption(
+                chat_id=callback.message.chat.id,
+                message_id=callback.message.message_id,
+                caption=f'<b>{product.title}</b>\n\n'
+                        f'<b>Description:</b> '
+                        f'<i>{product.description}</i>\n'
+                        f'<b>Composition:</b> '
+                        f'<i>{product.composition}</i>\n',
+                parse_mode="HTML",
+                reply_markup=markup)
+
     except AttributeError:
         if database.Consumer.is_admin(callback.from_user.id):
             buttons = [

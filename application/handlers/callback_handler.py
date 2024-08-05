@@ -27,10 +27,16 @@ async def process_callback(callback_query: CallbackQuery, state: FSMContext):
             await output.ignore_message(callback_query)
 
         case _ if "companies" in data:
-            await companies_catalog(callback_query)
+            if "initial" in data:
+                await companies_catalog(callback_query, True)
+            else:
+                await companies_catalog(callback_query)
 
         case _ if "products" in data:
-            await products_catalog(callback_query)
+            if "initial" in data:
+                await products_catalog(callback_query, True)
+            else:
+                await products_catalog(callback_query)
 
         case _ if "add-basket" in data:
             product_id = int(data.split('-')[0])
