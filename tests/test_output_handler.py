@@ -1,8 +1,10 @@
 from unittest.mock import patch, AsyncMock, MagicMock
 
 import pytest
-from aiogram.types import Message
+from aiogram.types import Message, InlineKeyboardButton
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from application.handlers.output_handler import confirm_delete_product
 from application.handlers.output_handler import print_orders_info
 from application.handlers.output_handler import print_profile_info
 
@@ -12,7 +14,7 @@ from application.handlers.output_handler import print_profile_info
 @patch('application.handlers.output_handler.main_menu', new_callable=AsyncMock)
 async def test_print_profile_info(mock_main_menu, mock_get_by_telegram_id):
     mock_user = MagicMock()
-    mock_user.username = 'testuser'
+    mock_user.username = 'test_user'
     mock_user.email = 'testuser@example.com'
     mock_user.bonuses = 100
 
@@ -27,7 +29,7 @@ async def test_print_profile_info(mock_main_menu, mock_get_by_telegram_id):
 
     message.answer.assert_called_once_with(
         'Flavour Flow user information:'
-        '\nUsername: testuser'
+        '\nUsername: test_user'
         '\nEmail: testuser@example.com'
         '\nBonuses: 100'
     )
@@ -80,3 +82,26 @@ async def test_print_orders_info(mock_main_menu, mock_get_company_by_id, mock_ge
     mock_get_by_telegram_id.assert_called_once_with(telegram_id)
     mock_get_all_by_user_id.assert_called_once_with(mock_user.id)
     mock_get_company_by_id.assert_called_once_with(mock_order.company_id)
+
+
+@pytest.mark.asyncio
+async def test_confirm_delete_product():
+    message = MagicMock(Message)
+    message.delete = AsyncMock()
+    message.answer = AsyncMock()
+
+    product_id = 123
+
+    await confirm_delete_product(message, product_id)
+
+    message.delete.assert_called_once()
+
+    expected_markup = InlineKeyboardBuilder().row(
+        InlineKeyboardButton(text='✅', callback_data=f'{product_id}-conf-del-prod'),
+        InlineKeyboardButton(text='❌', callback_data='deny-delete')
+    ).as_markup()
+
+    message.answer.assert_called_once_with(
+        'Do you really want to delete this product?',
+        reply_markup=expected_markup
+    )
